@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Overhead - every active satellite, live in 3D</title>
+<script>try{var p=localStorage.getItem('ovh:theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p}catch(e){document.documentElement.dataset.theme='dark'}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -16,36 +17,42 @@
 :root{
   --bg:#0F1A2E; --panel:#1A2D4A; --panel2:#213858; --line:#2E4A72;
   --ink:#EAF0F8; --ink2:#A9BAD2; --ink3:#7489A8;
-  --accent:#F2B340; --you:#7FE0C6;
+  --accent:#F2B340; --onaccent:#0F1A2E; --you:#7FE0C6;
+  --space:#0F1A2E; --hud:#EAF0F8; --hud2:#A9BAD2; --hud3:#7489A8; --hudbtn:rgba(26,45,74,.85); --halo:#000; --veil:rgba(15,26,46,.75);
+  --ok:#7FE0C6; --warn:#F2B340; --bad:#FF8FA3;
   --c0:#F2B340; --c1:#FFE9B0; --c2:#8CD1FF; --c3:#B49CFF; --c4:#FF9EC4; --c5:#7FE0C6;
   --c6:#FFB38A; --c7:#9CE39C; --c8:#C9D6FF; --c9:#E0B8FF; --c10:#FFD08A; --c11:#9DB4D1; --c12:#FF8FA3;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
-@media (prefers-color-scheme: light){ :root:not([data-theme="light"]){ } }
+/* Light theme: pale sky around a daylight globe; satellite colours are the deep versions of the dark-theme hues */
 :root[data-theme="light"]{
-  --bg:#0F1A2E; --panel:#F7F9FD; --panel2:#EDF2FA; --line:#C5D2E6;
-  --ink:#13223A; --ink2:#3E5476; --ink3:#6A7F9E; --accent:#C47F0E; --you:#13907A;
+  --bg:#E8EEF6; --panel:#FFFFFF; --panel2:#F1F5FA; --line:#C9D5E5;
+  --ink:#13223A; --ink2:#3E5476; --ink3:#5A6E8C; --accent:#B45309; --onaccent:#FFFFFF; --you:#0F766E;
+  --space:#DCE6F2; --hud:#0F1A2E; --hud2:#3E5476; --hud3:#5A6E8C; --hudbtn:rgba(255,255,255,.92); --halo:#fff; --veil:rgba(232,238,246,.85);
+  --ok:#0F766E; --warn:#B45309; --bad:#BE123C;
+  --c0:#B45309; --c1:#A16207; --c2:#0369A1; --c3:#6D28D9; --c4:#BE185D; --c5:#047857;
+  --c6:#C2410C; --c7:#15803D; --c8:#3730A3; --c9:#9333EA; --c10:#92400E; --c11:#475569; --c12:#BE123C;
 }
 *,*::before,*::after{box-sizing:inherit}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;overflow:hidden}
 #app{height:100%;display:grid;grid-template-rows:1fr auto}
-#mapwrap{position:relative;min-height:0;background:#0F1A2E}
+#mapwrap{position:relative;min-height:0;background:var(--space)}
 canvas{display:block;touch-action:none}
-.hud{position:absolute;left:14px;top:12px;pointer-events:none;color:#EAF0F8}
+.hud{position:absolute;left:14px;top:12px;pointer-events:none;color:var(--hud);text-shadow:0 1px 3px var(--halo)}
 .hud h1{font-size:19px;font-weight:600;margin:0;letter-spacing:-.01em}
 .hud .count{font-size:40px;font-weight:600;letter-spacing:-.03em;line-height:1;margin:6px 0 2px}
-.hud .sub{color:#A9BAD2;font-size:13px}
-.hud .sub b{color:#EAF0F8;font-weight:500}
-.clock{position:absolute;right:14px;top:12px;text-align:right;font-size:13px;color:#A9BAD2;pointer-events:none}
-.clock span{display:block;color:#EAF0F8;font-size:17px;font-weight:500}
-.hint{position:absolute;left:14px;bottom:12px;font-size:12px;color:#7489A8;pointer-events:none}
+.hud .sub{color:var(--hud2);font-size:13px}
+.hud .sub b{color:var(--hud);font-weight:500}
+.clock{position:absolute;right:14px;top:12px;text-align:right;font-size:13px;color:var(--hud2);pointer-events:none;text-shadow:0 1px 3px var(--halo)}
+.clock span{display:block;color:var(--hud);font-size:17px;font-weight:500}
+.hint{position:absolute;left:14px;bottom:12px;font-size:12px;color:var(--hud3);pointer-events:none;text-shadow:0 1px 3px var(--halo)}
 .viewbtns{position:absolute;right:14px;bottom:12px;display:flex;gap:6px}
-.viewbtns button{background:rgba(26,45,74,.85);color:#EAF0F8;border-color:#2E4A72}
-#label{position:absolute;pointer-events:none;color:#F2B340;font-size:13px;font-weight:500;transform:translate(10px,-8px);white-space:nowrap;text-shadow:0 1px 3px #000}
-#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,26,46,.75);color:#EAF0F8;text-align:center;padding:24px;font-size:15px}
-#loading span{display:block;color:#A9BAD2;font-size:13px;margin-top:6px}
+.viewbtns button{background:var(--hudbtn);color:var(--hud);border-color:var(--line)}
+#label{position:absolute;pointer-events:none;color:var(--accent);font-size:13px;font-weight:500;transform:translate(10px,-8px);white-space:nowrap;text-shadow:0 1px 3px var(--halo),0 0 2px var(--halo)}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--veil);color:var(--hud);text-align:center;padding:24px;font-size:15px}
+#loading span{display:block;color:var(--hud2);font-size:13px;margin-top:6px}
 #panel{background:var(--panel);border-top:1px solid var(--line);padding:10px 14px 12px;display:grid;gap:10px;max-height:44vh;overflow:auto}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 input[type=search]{flex:1;min-width:160px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:9px 12px;font:inherit;font-size:15px}
@@ -73,7 +80,11 @@ button.on{border-color:var(--accent)}
 .facts span{color:var(--ink3);font-size:13px;padding-top:1px}
 .facts b{font-weight:500;overflow-wrap:anywhere}
 .facts .st{display:inline-block;padding:1px 8px;border-radius:999px;font-size:13px;border:1px solid var(--line)}
-.facts .st.ok{border-color:#7FE0C6;color:#7FE0C6}.facts .st.part{border-color:#F2B340;color:#F2B340}.facts .st.bad{border-color:#FF8FA3;color:#FF8FA3}
+.facts .st.ok{border-color:var(--ok);color:var(--ok)}.facts .st.part{border-color:var(--warn);color:var(--warn)}.facts .st.bad{border-color:var(--bad);color:var(--bad)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:7px 14px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--onaccent);font-weight:500}
 #sel .row{margin-top:8px}
 .note{color:var(--ink3);font-size:12px}
 .note a{color:var(--ink2)}
@@ -118,6 +129,7 @@ button.on{border-color:var(--accent)}
       <select id="minEl"><option value="0">0° (horizon)</option><option value="10" selected>10°</option><option value="25">25°</option><option value="45">45°</option></select>
       <span class="note">above the horizon</span>
     </div>
+    <div class="row"><span class="note">Display</span><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
     <div class="note" id="fpNote"></div>
     <div id="sel">
       <h2 id="sname"></h2>
@@ -189,7 +201,7 @@ try{
 const G=D.groups, LAND=D.land;
 function meta(m){ return m; }
 const css=getComputedStyle(document.documentElement);
-const cols=G.map((_,i)=>css.getPropertyValue('--c'+i).trim());
+let cols=G.map((_,i)=>css.getPropertyValue('--c'+i).trim());
 const sats=[];
 for(const s of D.sats){
   try{ const rec=satellite.twoline2satrec(s[1],s[2]); if(rec.error) continue;
@@ -211,7 +223,7 @@ function save(){ try{ localStorage.setItem('overhead3d',JSON.stringify({on})); }
 const chips=document.getElementById('chips');
 const counts=G.map((_,i)=>sats.filter(s=>s.groups.includes(i)).length);
 const other=sats.filter(s=>!s.groups.length).length;
-G.forEach((g,i)=>{ const b=document.createElement('button'); b.className='chip'+(on[i]?' on':''); b.style.setProperty('--sw',cols[i]);
+G.forEach((g,i)=>{ const b=document.createElement('button'); b.className='chip'+(on[i]?' on':''); b.style.setProperty('--sw','var(--c'+i+')');
   b.innerHTML='<i></i>'+g+' <small>'+counts[i].toLocaleString()+'</small>';
   b.onclick=()=>{on[i]=!on[i]; b.classList.toggle('on',on[i]); save(); refresh();}; chips.appendChild(b); });
 const ob=document.createElement('button'); ob.className='chip on'; ob.style.setProperty('--sw','var(--ink3)');
@@ -235,34 +247,42 @@ controls.enableDamping=true; controls.dampingFactor=.08; controls.minDistance=R*
 controls.zoomSpeed=.8;
 
 // Earth texture drawn from embedded land polygons
+const THEMES={
+  dark:{ocean:'#0B1B33',grid:'#1A3150',land:'#3A6496',coast:'#9CC0EA',clear:0x0F1A2E,atmo:0x8CD1FF,atmoOp:.08,stars:.5,ambient:.8,sun:.55,
+        sel:0xF2B340,fp:0xA9BAD2,you:0x7FE0C6,other:'#7489A8',outline:[0,0,0,0]},
+  light:{ocean:'#9CC2E8',grid:'#B4D1EE',land:'#F4EEDD',coast:'#4E6585',clear:0xDCE6F2,atmo:0x2F74C0,atmoOp:.12,stars:0,ambient:.95,sun:.3,
+        sel:0xB45309,fp:0x475569,you:0x0F766E,other:'#64748B',outline:[1,1,1,.95]}};
+let TH=THEMES[document.documentElement.dataset.theme==='light'?'light':'dark'];
 function makeTexture(){ const w=4096,h=2048,c=document.createElement('canvas'); c.width=w;c.height=h; const g=c.getContext('2d');
-  g.fillStyle='#17294A'; g.fillRect(0,0,w,h);
-  g.strokeStyle='#213A5E'; g.lineWidth=2;
+  g.fillStyle=TH.ocean; g.fillRect(0,0,w,h);
+  g.strokeStyle=TH.grid; g.lineWidth=2;
   for(let lon=-180;lon<=180;lon+=30){const x=(lon+180)/360*w;g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
   for(let lat=-60;lat<=60;lat+=30){const y=(90-lat)/180*h;g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
-  g.fillStyle='#34557F'; g.beginPath();
+  g.fillStyle=TH.land; g.beginPath();
   for(const ring of LAND){ ring.forEach((p,i)=>{const x=(p[0]+180)/360*w,y=(90-p[1])/180*h; i?g.lineTo(x,y):g.moveTo(x,y);}); g.closePath(); }
-  g.fill('evenodd'); g.strokeStyle='#4F75A8'; g.lineWidth=1.5; g.stroke();
+  g.fill('evenodd'); g.strokeStyle=TH.coast; g.lineWidth=2.5; g.stroke();
   const t=new THREE.CanvasTexture(c); t.anisotropy=renderer.capabilities.getMaxAnisotropy(); return t; }
 const earth=new THREE.Mesh(new THREE.SphereGeometry(R,96,64),new THREE.MeshLambertMaterial({map:makeTexture()}));
 // No rotation needed: three.js puts the texture's centre (lon 0) on +x and lon 90E on -z, which already matches
 // toScene() below. (A -90° turn here once drew the whole map a quarter-turn east, e.g. the UK over Russia.)
+earth.userData.theme=TH===THEMES.light?'light':'dark';
 scene.add(earth);
 // faint atmosphere rim
 const atmo=new THREE.Mesh(new THREE.SphereGeometry(R*1.02,64,48),new THREE.MeshBasicMaterial({color:0x8CD1FF,transparent:true,opacity:.06,side:THREE.BackSide})); scene.add(atmo);
-scene.add(new THREE.AmbientLight(0xffffff,.5));
+const amb=new THREE.AmbientLight(0xffffff,.5); scene.add(amb);
 const sun=new THREE.DirectionalLight(0xfff4e0,1.05); scene.add(sun);
 // stars
-(function(){ const n=1500,p=new Float32Array(n*3); for(let i=0;i<n;i++){ const u=Math.random()*2-1,th=Math.random()*6.2832,rr=Math.sqrt(1-u*u); const v=new THREE.Vector3(rr*Math.cos(th),u,rr*Math.sin(th)).multiplyScalar(300); p.set([v.x,v.y,v.z],i*3);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3)); scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x9DB4D1,size:.5,sizeAttenuation:false,transparent:true,opacity:.5}))); })();
+const starMat=new THREE.PointsMaterial({color:0x9DB4D1,size:.5,sizeAttenuation:false,transparent:true,opacity:.5});
+(function(){ const n=1500,p=new Float32Array(n*3); for(let i=0;i<n;i++){ const u=Math.random()*2-1,th=Math.random()*6.2832,rr=Math.sqrt(1-u*u); const v=new THREE.Vector3(rr*Math.cos(th),u,rr*Math.sin(th)).multiplyScalar(300); p.set([v.x,v.y,v.z],i*3);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3)); scene.add(new THREE.Points(g,starMat)); })();
 
 // satellites as points
 const pos=new Float32Array(N*3), col=new Float32Array(N*3), siz=new Float32Array(N);
 sats.forEach((s,i)=>{ const gi=s.groups.length?s.groups[0]:-1; const c=new THREE.Color(gi>=0?cols[gi]:'#7489A8'); col.set([c.r,c.g,c.b],i*3); siz[i]=gi===11?2.2:(gi<0?2.6:3.4); });
 const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(pos,3)); geo.setAttribute('color',new THREE.BufferAttribute(col,3)); geo.setAttribute('psize',new THREE.BufferAttribute(siz,1));
 const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,
-  uniforms:{dpr:{value:renderer.getPixelRatio()}},
+  uniforms:{dpr:{value:renderer.getPixelRatio()},outline:{value:new THREE.Vector4(0,0,0,0)}},
   vertexShader:'attribute float psize; attribute vec3 color; varying vec3 vC; uniform float dpr; void main(){ vC=color; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_Position=projectionMatrix*mv; gl_PointSize=psize*dpr*clamp(40.0/-mv.z,0.5,1.8); }',
-  fragmentShader:'varying vec3 vC; void main(){ float d=length(gl_PointCoord-0.5); if(d>0.5) discard; gl_FragColor=vec4(vC,1.0-smoothstep(0.3,0.5,d)); }'});
+  fragmentShader:'uniform vec4 outline; varying vec3 vC; void main(){ float d=length(gl_PointCoord-0.5); if(d>0.5) discard; vec3 c=mix(vC,outline.rgb,outline.a*smoothstep(0.30,0.36,d)); gl_FragColor=vec4(c,1.0-smoothstep(mix(0.3,0.44,outline.a),0.5,d)); }'});
 const points=new THREE.Points(geo,mat); points.frustumCulled=false; scene.add(points);
 const FAR=1e6;
 function refresh(){ // apply visibility by moving hidden points far away
@@ -413,6 +433,20 @@ function tick(force){ const now=new Date(); document.getElementById('utc').textC
     label.style.display=behind?'none':'block'; selMarker.visible=!behind; label.style.left=((v.x+1)/2*r.width)+'px'; label.style.top=((1-v.y)/2*r.height)+'px'; }
   if(fly){ fly.t=Math.min(1,fly.t+0.03); const e=1-Math.pow(1-fly.t,3); camera.position.lerpVectors(fly.from,fly.to,e); if(fly.t>=1) fly=null; }
   controls.update(); renderer.render(scene,camera); requestAnimationFrame(()=>tick(false)); }
+// display theme
+let themePref='auto'; try{ themePref=localStorage.getItem('ovh:theme')||'auto'; }catch(e){}
+const darkMq=matchMedia('(prefers-color-scheme: light)');
+function applyTheme(){ const name=themePref==='auto'?(darkMq.matches?'light':'dark'):themePref; document.documentElement.dataset.theme=name; TH=THEMES[name];
+  if(earth.userData.theme!==name){ const old=earth.material.map; earth.material.map=makeTexture(); earth.material.needsUpdate=true; if(old) old.dispose(); earth.userData.theme=name; }
+  renderer.setClearColor(TH.clear); atmo.material.color.setHex(TH.atmo); atmo.material.opacity=TH.atmoOp; starMat.opacity=TH.stars; amb.intensity=TH.ambient; sun.intensity=TH.sun;
+  for(const m of [selMarker,trackLine,fpSel,cone,disc]) m.material.color.setHex(TH.sel); fpAll.material.color.setHex(TH.fp); youMarker.material.color.setHex(TH.you); youRing.material.color.setHex(TH.you);
+  mat.uniforms.outline.value.set(...TH.outline);
+  const cs=getComputedStyle(document.documentElement); cols=G.map((_,i)=>cs.getPropertyValue('--c'+i).trim());
+  sats.forEach((s,i)=>{ const gi=s.groups.length?s.groups[0]:-1; const c=new THREE.Color(gi>=0?cols[gi]:TH.other); col.set([c.r,c.g,c.b],i*3); }); geo.attributes.color.needsUpdate=true;
+  document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===themePref)); }
+document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=b.dataset.t; try{ localStorage.setItem('ovh:theme',themePref); }catch(e){} applyTheme(); });
+darkMq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); });
+applyTheme();
 resize(); const iss=sats.find(s=>s.name.startsWith('ISS (ZARYA)')); tick(true); if(iss){ select(iss); camera.position.set(iss.x,iss.y,iss.z).normalize().multiplyScalar(22); }
 })();
 </script>
