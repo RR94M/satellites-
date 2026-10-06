@@ -146,7 +146,12 @@ const GROUPS=[['stations','Space stations'],['visual','Brightest objects'],['gps
 const MOJIBAKE={'Õ':'’','Ô':'‘','Ò':'“','Ó':'”','Ð':'–','Ñ':'—','Ê':' ','¡':'°'};
 const NAME_FIXES=[[/Socit Europenne/g,'Société Européenne'],[/\bfr (Luft|Raumfahrt)/g,'für $1'],[/Ecole Polytechnique Fdrale de Lanne/g,'École Polytechnique Fédérale de Lausanne'],
   [/Wrzburg/g,'Würzburg'],[/Tcnia/g,'Técnica'],[/TB_TAK/g,'TÜBİTAK'],[/Satelit Nntara/g,'Satelit Nusantara'],[/Morroco/g,'Morocco'],[/theExploitation/g,'the Exploitation']];
-function fixText(t){ if(typeof t!=='string') return t; t=t.replace(/[ÕÔÒÓÐÑÊ¡]/g,c=>MOJIBAKE[c]); for(const [re,to] of NAME_FIXES) t=t.replace(re,to); return t.replace(/ {2,}/g,' ').trim(); }
+// Notes that are scrambled beyond repair, or make claims the source never did, are hidden rather than shown.
+const GARBLED=[/surveillance of satellites/i,/Aathfinusrs|Pathfinfrrs|Fathfinusrs|Gnterprise|Gntersputnik|Vanelliea|Baiellico|Capellico|Gmericas|conscollation|gonseallation/i,
+  /^https?:\/\//,/^Communications communications\b/i];
+function fixText(t){ if(typeof t!=='string') return t; t=t.replace(/[ÕÔÒÓÐÑÊ¡]/g,c=>MOJIBAKE[c]); for(const [re,to] of NAME_FIXES) t=t.replace(re,to);
+  t=t.replace(/\s*Read more at https?:\/\/\S+/g,'').replace(/ - \.$/,'.').replace(/ {2,}/g,' ').trim();
+  return GARBLED.some(re=>re.test(t))?'':t; }
 const msg=t=>{ const e=document.getElementById('loadmsg'); if(e) e.textContent=t; };
 // cached fetch: CelesTrak asks clients not to pull the same data more than every two hours
 async function cached(key,url,ttlHours,asText){ try{ const c=JSON.parse(localStorage.getItem('ovh:'+key)||'null'); if(c&&Date.now()-c.t<ttlHours*3600e3) return c.v; }catch(e){}
