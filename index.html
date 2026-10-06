@@ -245,7 +245,8 @@ function makeTexture(){ const w=4096,h=2048,c=document.createElement('canvas'); 
   g.fill('evenodd'); g.strokeStyle='#4F75A8'; g.lineWidth=1.5; g.stroke();
   const t=new THREE.CanvasTexture(c); t.anisotropy=renderer.capabilities.getMaxAnisotropy(); return t; }
 const earth=new THREE.Mesh(new THREE.SphereGeometry(R,96,64),new THREE.MeshLambertMaterial({map:makeTexture()}));
-earth.rotation.y=-Math.PI/2; // so lon 0 faces +x
+// No rotation needed: three.js puts the texture's centre (lon 0) on +x and lon 90E on -z, which already matches
+// toScene() below. (A -90° turn here once drew the whole map a quarter-turn east, e.g. the UK over Russia.)
 scene.add(earth);
 // faint atmosphere rim
 const atmo=new THREE.Mesh(new THREE.SphereGeometry(R*1.02,64,48),new THREE.MeshBasicMaterial({color:0x8CD1FF,transparent:true,opacity:.06,side:THREE.BackSide})); scene.add(atmo);
