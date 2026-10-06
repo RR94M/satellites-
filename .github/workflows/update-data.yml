@@ -1,0 +1,51 @@
+# Downloads orbital elements from CelesTrak every 6 hours and publishes them on the `data` branch,
+# so visitors' browsers load them from GitHub instead of each hitting CelesTrak (which rate-limits
+# repeat downloads with HTTP 403). The branch is force-pushed as a single commit, so it never grows.
+name: Update satellite data
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download from CelesTrak
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          groups="active stations visual gps-ops galileo glo-ops weather science planet iridium-NEXT oneweb geo starlink"
+          for g in $groups; do
+            for attempt in 1 2 3; do
+              code=$(curl -sS -A "Overhead satellite tracker (github.com/${GITHUB_REPOSITORY})" \
+                -o "out/$g.tle" -w '%{http_code}' \
+                "https://celestrak.org/NORAD/elements/gp.php?GROUP=$g&FORMAT=tle") || code=000
+              if [ "$code" = 200 ] && grep -q '^1 ' "out/$g.tle"; then break; fi
+              echo "::warning::$g attempt $attempt got HTTP $code"; rm -f "out/$g.tle"; sleep 20
+            done
+            [ -f "out/$g.tle" ] || { echo "::error::Could not download $g"; exit 1; }
+            echo "$g: $(grep -c '^1 ' "out/$g.tle") objects"
+            sleep 3   # be gentle with CelesTrak
+          done
+          [ "$(grep -c '^1 ' out/active.tle)" -gt 5000 ] || { echo "::error::active list looks truncated"; exit 1; }
+          date -u +%Y-%m-%dT%H:%MZ > out/updated.txt
+
+      - name: Publish to the data branch
+        run: |
+          set -euo pipefail
+          cd out
+          git init -q -b data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Satellite data $(cat updated.txt)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" data

@@ -159,12 +159,20 @@ const msg=t=>{ const e=document.getElementById('loadmsg'); if(e) e.textContent=t
 async function cached(key,url,ttlHours,asText){ try{ const c=JSON.parse(localStorage.getItem('ovh:'+key)||'null'); if(c&&Date.now()-c.t<ttlHours*3600e3) return c.v; }catch(e){}
   const r=await fetch(url); if(!r.ok) throw new Error(url+' '+r.status); const v=asText?await r.text():await r.json();
   try{ localStorage.setItem('ovh:'+key,JSON.stringify({t:Date.now(),v})); }catch(e){} return v; }
+// Orbital elements come from this repo's `data` branch, which a GitHub Action refreshes from CelesTrak every
+// 6 hours. Visitors never hit CelesTrak directly for these, so its per-address download limit (HTTP 403)
+// can't block them. CelesTrak itself is only a fallback if the copy is unreachable.
+const DATA='https://raw.githubusercontent.com/rr94-ai/satellites-/data/';
+async function orbits(group){
+  try{ const r=await fetch(DATA+group+'.tle'); if(r.ok){ const t=await r.text(); if(t.includes('\n1 ')) return t; } }catch(e){}
+  return cached('g:'+group,'https://celestrak.org/NORAD/elements/gp.php?GROUP='+group+'&FORMAT=tle',6,true); }
 let D;
 try{
-  const [tle,land,...groups]=await Promise.all([
-    cached('active','https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle',6,true),
+  const [tle,land,updated,...groups]=await Promise.all([
+    orbits('active'),
     cached('land','https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json',720,false),
-    ...GROUPS.map(g=>cached('g:'+g[0],'https://celestrak.org/NORAD/elements/gp.php?GROUP='+g[0]+'&FORMAT=tle',6,true).catch(()=>''))
+    fetch(DATA+'updated.txt').then(r=>r.ok?r.text():'').catch(()=>''),
+    ...GROUPS.map(g=>orbits(g[0]).catch(()=>''))
   ]);
   msg('Building the globe...');
   const gid=groups.map(t=>{ const s=new Set(); for(const l of t.split(/\r?\n/)) if(l.startsWith('1 ')) s.add(l.slice(2,7)); return s; });
@@ -175,7 +183,7 @@ try{
     const m={id:String(+nid)}; if(META&&META.sats[m.id]){ META.sats[m.id].forEach((v,k)=>{ if(v>=0) m[META.keys[k]]=META.strings[v]; }); if(m.ownerCode){ m.owner=CODES.owners[m.ownerCode]||m.ownerCode; } if(m.op) m.src=m.contractor||m.mass?'ucs':'inferred'; }
     sats.push([name,l1,l2,gi,m]); i+=2; }
   const feat=topojson.feature(land,land.objects.land); const rings=[]; for(const f of feat.features){ const cs=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates; for(const p of cs) for(const ring of p) rings.push(ring); }
-  D={groups:GROUPS.map(g=>g[1]).concat(['BeiDou']),sats,land:rings,epoch:new Date().toISOString().slice(0,10),metaDate:META?META.updated:null};
+  D={groups:GROUPS.map(g=>g[1]).concat(['BeiDou']),sats,land:rings,epoch:/^\d{4}-\d\d-\d\dT\d\d:\d\dZ/.test(updated.trim())?updated.trim().replace('T',' ').replace('Z',' UTC'):new Date().toISOString().slice(0,10),metaDate:META?META.updated:null};
   document.getElementById('loading').remove();
 }catch(e){ msg('Could not load the catalogue: '+e.message+'. Check your connection and reload.'); throw e; }
 const G=D.groups, LAND=D.land;
