@@ -13,6 +13,7 @@
 <script src="lib/tz-lookup.js"></script>
 <script src="lib/localtime.js"></script>
 <script src="lib/aurora.js"></script>
+<script src="lib/where.js"></script>
 <style>
 /* Space Grotesk, self-hosted (SIL Open Font License, see fonts/OFL.txt) */
 @font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
@@ -42,6 +43,14 @@ header{display:grid;gap:6px}
 h1{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:4px 0 0}
 .where{color:var(--ink2);font-size:14px}
 .where button{margin-left:6px}
+.where .warn{color:var(--ink);margin:0 0 8px}
+.where #locate{margin-left:0}
+.placeform{display:flex;gap:6px;margin-top:8px;max-width:420px}
+.placeform input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;font-size:16px}
+.placeform input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.placeform button,.places button{margin-left:0}
+.places{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:6px;max-width:420px}
+.places button{text-align:left;width:100%}
 button{font:inherit;font-size:14px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
 button.primary{background:var(--accent);color:var(--onaccent);border-color:var(--accent);font-weight:500}
 button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration:underline;font-size:inherit}
@@ -91,7 +100,7 @@ footer{color:var(--ink3);font-size:12px;max-width:640px;margin:16px auto 0}
   </header>
   <div id="content"><section><p class="loading">Loading the latest orbits…</p></section></div>
 </main>
-<footer>Orbits from <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>, aurora forecast from <a href="https://www.swpc.noaa.gov" target="_blank" rel="noopener">NOAA Space Weather Prediction Center</a>, refreshed every 6 hours. Sightings are worked out on your device; your location never leaves it.</footer>
+<footer>Orbits from <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>, aurora forecast from <a href="https://www.swpc.noaa.gov" target="_blank" rel="noopener">NOAA Space Weather Prediction Center</a>, refreshed every 6 hours. Sightings are worked out on your device; your location never leaves it. If you type a town instead, just that name is looked up with <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>.</footer>
 <script>
 (async function(){
 const DATA='https://raw.githubusercontent.com/rr94-ai/satellites-/data/';
@@ -107,17 +116,20 @@ function applyTheme(){ document.documentElement.dataset.theme=themePref==='auto'
 document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=b.dataset.t; try{ localStorage.setItem('ovh:theme',themePref); }catch(e){} applyTheme(); });
 mq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); }); applyTheme();
 
-// ---------- location: asked once, kept on this device ----------
-let loc=null; try{ loc=JSON.parse(localStorage.getItem('ovh:loc')||'null'); }catch(e){}
-function setWhere(){ const w=$('where');
-  if(!loc){ w.innerHTML='Share your location to see what passes over you. <button class="primary" id="locate">Use my location</button>'; $('locate').onclick=locate; return; }
-  w.innerHTML='Near '+Math.abs(loc.lat).toFixed(1)+'°'+(loc.lat>=0?'N':'S')+', '+Math.abs(loc.lon).toFixed(1)+'°'+(loc.lon>=0?'E':'W')+' · saved on this device only · '
-    +(LT.same?'times in '+esc(LT.abbr):'<b>times are local there ('+esc(LT.zone.replace(/_/g,' ')+', '+LT.abbr)+')</b>, not your phone’s time zone')+' · <button class="link" id="relocate">Update</button> · <button class="link" id="forget">Forget</button>';
-  $('relocate').onclick=locate; $('forget').onclick=()=>{ try{ localStorage.removeItem('ovh:loc'); }catch(e){} loc=null; render(); }; }
-function locate(){ if(!navigator.geolocation){ $('where').textContent='Location is not available in this browser.'; return; }
-  $('where').textContent='Finding you…';
-  navigator.geolocation.getCurrentPosition(p=>{ loc={lat:+p.coords.latitude.toFixed(2),lon:+p.coords.longitude.toFixed(2)}; try{ localStorage.setItem('ovh:loc',JSON.stringify(loc)); }catch(e){} render(); },
-    ()=>{ $('where').innerHTML='Location was blocked. Allow it for this site in your browser settings, then <button class="link" id="retry">try again</button>.'; $('retry').onclick=locate; },{timeout:15000}); }
+// ---------- location: asked once, kept on this device (lib/where.js, shared with the globe) ----------
+let loc=WHERE.saved(), choosing=false;
+function usePlace(l){ loc=l; choosing=false; render(); }
+function chooser(msg){ choosing=true; const w=$('where');
+  w.innerHTML=(msg?'<p class="warn">'+esc(msg)+'</p>':'Share your location to see what passes over you. ')+'<button class="primary" id="locate">Use my location</button> <span>or type your town:</span><div id="placebox"></div>'
+    +(loc?'<button class="link" id="keep">Keep '+esc(WHERE.label(loc))+'</button>':'');
+  $('locate').onclick=locate; WHERE.picker($('placebox'),usePlace); if($('keep')) $('keep').onclick=()=>{ choosing=false; setWhere(); }; }
+function setWhere(){ if(choosing) return; const w=$('where');
+  if(!loc){ chooser(''); return; }
+  w.innerHTML='Near '+esc(WHERE.label(loc))+' · saved on this device only · '
+    +(LT.same?'times in '+esc(LT.abbr):'<b>times are local there ('+esc(LT.zone.replace(/_/g,' ')+', '+LT.abbr)+')</b>, not your phone’s time zone')+' · <button class="link" id="relocate">Change</button> · <button class="link" id="forget">Forget</button>';
+  $('relocate').onclick=()=>chooser(''); $('forget').onclick=()=>{ WHERE.forget(); loc=null; choosing=false; render(); }; }
+function locate(){ choosing=true; $('where').textContent='Finding you… (if your phone asks, tap Allow)';
+  WHERE.locate().then(usePlace,e=>chooser(WHERE.help(e))); }
 
 // ---------- Sun, Moon, darkness ----------
 function sunEcf(d){ const j=d.getTime()/864e5-10957.5, L=(280.46+0.9856474*j)%360, g=(357.528+0.9856003*j)*D2R;

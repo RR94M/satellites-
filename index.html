@@ -13,6 +13,7 @@
 <script src="lib/tz-lookup.js"></script>
 <script src="lib/localtime.js"></script>
 <script src="lib/aurora.js"></script>
+<script src="lib/where.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
@@ -111,6 +112,14 @@ button.on{border-color:var(--accent)}
 .note{color:var(--ink3);font-size:12px}
 .note a{color:var(--ink2)}
 #you{display:none;color:var(--you);font-size:13px}
+#placebox:empty{display:none}
+#placebox{font-size:13px;color:var(--ink2)}
+#placebox .warn{color:var(--ink);margin-bottom:6px}
+button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration:underline;font-size:inherit}
+.placeform{display:flex;gap:6px;margin-top:6px}
+.placeform input{min-width:0}
+.places{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.places button{text-align:left}
 .tonight{display:block;border:1px solid var(--accent);border-radius:8px;padding:9px 12px;color:var(--ink);text-decoration:none;font-size:14px}
 .tonight span{color:var(--accent);float:right}
 #aur{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--ink2)}
@@ -145,6 +154,7 @@ button.on{border-color:var(--accent)}
     </div>
     <div id="results"></div>
     <div id="you"></div>
+    <div id="placebox"></div>
     <div id="aur"><button id="aurBtn" class="on" aria-pressed="true"><i></i>Aurora</button><div id="aurTxt">Loading the aurora forecast…</div><div class="note" id="aurKey"></div></div>
     <a class="tonight" href="tonight.html">Tonight’s sky: ISS sightings, satellite trains, aurora chance <span aria-hidden="true">→</span></a>
     <div class="row"><span class="note">Owned by</span><select id="country"><option value="">Any country or organisation</option></select></div>
@@ -575,12 +585,20 @@ function fromLink(){ const id=(location.hash.match(/^#(\d{1,6})$/)||[])[1]; retu
 
 // location
 const you=document.getElementById('you'), hb=document.getElementById('horizon');
-function requestLocation(){ if(!navigator.geolocation){you.style.display='block';you.textContent='Location is not available in this browser.';return;}
-  you.style.display='block'; you.textContent='Finding you...';
-  navigator.geolocation.getCurrentPosition(p=>{ me={latitude:p.coords.latitude*Math.PI/180,longitude:p.coords.longitude*Math.PI/180,height:(p.coords.altitude||0)/1000}; myTime=localTime(p.coords.latitude,p.coords.longitude);
-      const ecf=satellite.geodeticToEcf(me); const qv=toScene(ecf); youMarker.position.set(qv[0],qv[1],qv[2]); youRing.position.copy(youMarker.position); youRing.lookAt(0,0,0); youMarker.visible=youRing.visible=true;
-      hb.style.display='inline-block'; flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4)); passCache.clear(); tick(true); renderPasses(sel); describeAurora(); },
-   err=>{ you.textContent='Location was blocked, so the horizon filter and sightings are off. You can still track everything.'; },{timeout:10000}); }
+const placebox=document.getElementById('placebox');
+// your spot: from the device, or a typed place (lib/where.js); saved on this device only and shared with the Tonight page
+function setMe(l,fly){ me={latitude:l.lat*Math.PI/180,longitude:l.lon*Math.PI/180,height:(l.alt||0)/1000}; myTime=localTime(l.lat,l.lon);
+  const ecf=satellite.geodeticToEcf(me); const qv=toScene(ecf); youMarker.position.set(qv[0],qv[1],qv[2]); youRing.position.copy(youMarker.position); youRing.lookAt(0,0,0); youMarker.visible=youRing.visible=true;
+  hb.style.display='inline-block'; you.style.display='block'; if(fly) flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4));
+  placebox.innerHTML='Your location: '+esc(WHERE.label(l))+', saved on this device only · <button class="link" id="placeChange">Change</button> · <button class="link" id="placeForget">Forget</button>';
+  document.getElementById('placeChange').onclick=()=>askPlace(''); document.getElementById('placeForget').onclick=clearMe;
+  passCache.clear(); tick(true); renderPasses(sel); describeAurora(); }
+function clearMe(){ WHERE.forget(); me=null; myTime=null; youMarker.visible=youRing.visible=false; horizonOnly=false; hb.classList.remove('on'); hb.style.display='none';
+  you.style.display='none'; placebox.innerHTML=''; passCache.clear(); refresh(); renderPasses(sel); describeAurora(); }
+function askPlace(msg){ placebox.innerHTML=(msg?'<div class="warn">'+esc(msg)+'</div>':'Type your town, or use the “Use my location” button above.')+'<div id="placePick"></div>';
+  WHERE.picker(document.getElementById('placePick'),l=>setMe(l,true)).focus(); }
+function requestLocation(){ you.style.display='block'; you.textContent='Finding you… (if your phone asks, tap Allow)';
+  WHERE.locate().then(l=>setMe(l,true),e=>{ if(!me) you.style.display='none'; askPlace(WHERE.help(e)); }); }
 document.getElementById('locbtn').onclick=requestLocation;
 hb.onclick=()=>{ horizonOnly=!horizonOnly; hb.classList.toggle('on',horizonOnly); refresh(); };
 
@@ -611,6 +629,7 @@ document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=
 darkMq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); });
 applyTheme();
 setAurBtn(); loadAurora(); setInterval(loadAurora,10*60e3);
+{ const l=WHERE.saved(); if(l) setMe(l,false); }
 resize(); const iss=fromLink()||sats.find(s=>s.name.startsWith('ISS (ZARYA)')); tick(true); if(iss){ select(iss); camera.position.set(iss.x,iss.y,iss.z).normalize().multiplyScalar(22); }
 })();
 </script>
