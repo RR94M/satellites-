@@ -249,7 +249,7 @@ function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; set
 
   // darkness and Moon
   const f=(k,v)=>'<div><span>'+k+'</span><b>'+v+'</b></div>';
-  out.push('<section><h2>When it gets dark</h2><p class="sub">'+LT.date(ws,{weekday:'long',day:'numeric',month:'long'})+' into '+LT.date(we,{weekday:'long'})+'</p><div class="facts">'
+  out.push('<section id="t-dark"><h2>When it gets dark</h2><p class="sub">'+LT.date(ws,{weekday:'long',day:'numeric',month:'long'})+' into '+LT.date(we,{weekday:'long'})+'</p><div class="facts">'
     +f('Sunset',ev.sunset?fmtTime(ev.sunset):'No sunset')+f('Properly dark from',ev.dark?fmtTime(ev.dark):'Never fully dark')+f('Dark until',ev.darkEnd?fmtTime(ev.darkEnd):'–')+f('Sunrise',ev.sunrise?fmtTime(ev.sunrise):'–')
     +f('Moon',esc(m.name))+f('Moon lit','about '+Math.round(m.lit*100)+'%')+'</div>'
     +cloudStrip(ev.sunset||ws+6*36e5,ev.sunrise||ws+18*36e5,STATIONS.flatMap(([,rec])=>passes(rec,obs,Math.max(now-5*6e4,ev.sunset||ws),ev.sunrise||we,6).map(p=>p.start)))
@@ -259,7 +259,7 @@ function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; set
   const end=now+3*864e5; let rows=[];
   for(const [name,rec] of STATIONS) for(const p of passes(rec,obs,now-5*6e4,end,6)) if(p.end>=now) rows.push([name==='the ISS'?'ISS':'Tiangong',p]);
   rows.sort((a,b)=>a[1].start-b[1].start);
-  let st='<section><h2>Space stations</h2><p class="sub">The International Space Station and China’s Tiangong: steady, bright lights crossing the sky in a few minutes. Next 3 days.</p>';
+  let st='<section id="t-stations"><h2>Space stations</h2><p class="sub">The International Space Station and China’s Tiangong: steady, bright lights crossing the sky in a few minutes. Next 3 days.</p>';
   if(rows.length) st+=rows.slice(0,6).map(([n,p])=>passRow(n,p)).join('');
   else st+='<p class="note">No sightings from where you are in the next 3 days. Satellites can only be seen around dusk and dawn, when your sky is dark but they are still in sunlight.</p>';
   if(!rows.some(r=>r[0]==='ISS')){ // the ISS has viewing "seasons": say when the next one starts
@@ -268,7 +268,7 @@ function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; set
   out.push(st+'<p class="note">The sky charts show your sky as if looking down on a compass: north at the top, the dot is where it appears. Times can shift by a minute or so; check again on the day.</p></section>');
 
   // satellite trains
-  let tr='<section><h2>Satellite trains</h2><p class="sub">Freshly launched Starlink, Kuiper and similar satellites travel in a tight line of lights for a few days after launch.</p>';
+  let tr='<section id="t-trains"><h2>Satellite trains</h2><p class="sub">Freshly launched Starlink, Kuiper and similar satellites travel in a tight line of lights for a few days after launch.</p>';
   const list=(trains&&trains.trains)||[]; let found=0;
   for(const t of list.slice(0,3)){ const rec=satellite.twoline2satrec(t.tle[0],t.tle[1]), per=2*Math.PI/rec.no, lineMin=Math.max(1,Math.round(t.length/360*per));
     for(const p of passes(rec,obs,now-5*6e4,end,2)) if(p.end>=now){ found++; tr+=passRow(t.family+' train',p,t.count+' satellites launched as '+esc(t.designator)+', the line takes about '+lineMin+' min to pass'); } }
@@ -276,7 +276,7 @@ function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; set
   out.push(tr+'</section>');
 
   // aurora
-  let au='<section><h2>Aurora</h2>';
+  let au='<section id="t-aurora"><h2>Aurora</h2>'; let auTonight='';
   const slots=Array.isArray(kp)?kp.map(x=>({t:Date.parse(x.time_tag+'Z'),kp:+x.kp,kind:x.observed})).filter(x=>isFinite(x.t)&&isFinite(x.kp)):[];
   if(!slots.length) au+='<p class="note">The aurora forecast isn’t available right now.</p>';
   else { const need=AURORA.kpNeeded(loc.lat,loc.lon), side=loc.lat>=0?'northern':'southern';
@@ -285,10 +285,18 @@ function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; set
       const inNight=slots.filter(x=>x.t+3*36e5>a&&x.t<b); const top=inNight.length?Math.max(...inNight.map(x=>x.kp)):null;
       const label=k===0?'Tonight':LT.date(s0,{weekday:'long'});
       if(top===null){ au+='<div class="night"><span>'+label+'</span><b>–</b><i class="low">No forecast yet</i></div>'; continue; }
-      const [cls,txt]=auroraVerdict(top,need), cc=cloudAvg(a,b);
+      const [cls,txt]=auroraVerdict(top,need), cc=cloudAvg(a,b); if(k===0) auTonight=txt.split(',')[0];
       au+='<div class="night"><span>'+label+'</span><b>Kp '+top.toFixed(1)+'</b><i class="'+cls+'">'+txt+'</i>'+(cc!=null?'<i class="cl '+cloudWord(cc)[0]+'" style="display:block">'+cloudWord(cc)[1]+' ('+Math.round(cc)+'% cloud)</i>':'')+'</div>'; }
     au+='</div><p class="note">Kp measures how disturbed Earth’s magnetic field is, from 0 (calm) to 9 (major storm). Forecasts more than a day out are rough; look '+(loc.lat>=0?'north':'south')+', away from streetlights, and phone cameras often pick up aurora your eyes miss. <a href="spaceweather.html">Live solar wind and storm forecast →</a></p>'; }
   out.push(au+'</section>');
+  // jump chips with tonight's headline values
+  const ccTonight=cloudAvg(ev.dark||ws+6*36e5,ev.darkEnd||ws+18*36e5);
+  out.unshift('<nav class="jump" aria-label="Jump to">'
+    +'<a href="#t-dark">🌙 Dark <small>'+(ev.dark?fmtTime(ev.dark):'never')+'</small></a>'
+    +(ccTonight!=null?'<a href="#t-dark">☁️ Cloud <small>'+Math.round(ccTonight)+'%</small></a>':'')
+    +'<a href="#t-stations">🛰️ Sightings <small>'+rows.length+'</small></a>'
+    +'<a href="#t-trains">🚂 Trains <small>'+found+'</small></a>'
+    +'<a href="#t-aurora">🟢 Aurora <small>'+esc(auTonight||'–')+'</small></a></nav>');
   $('content').innerHTML=out.join(''); }
 
 if(!STATIONS.length) $('content').innerHTML='<section><p class="note">Couldn’t load the latest orbits. Check your connection and reload.</p></section>';

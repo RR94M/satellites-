@@ -62,6 +62,10 @@ button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var
 .seg button.on{background:var(--accent);color:var(--onaccent);font-weight:500}
 .filters{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .filters .note{margin:0}
+.fchips{display:flex;flex-wrap:wrap;gap:6px}
+.fchips button{padding:5px 12px;border-radius:999px;font-size:13px;background:transparent;color:var(--ink2)}
+.fchips button.on{border-color:var(--accent);color:var(--ink);background:var(--panel2)}
+.fchips small{color:var(--ink3)}
 section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
 section>h2{font-size:17px;font-weight:600;margin:0 0 8px}
 .note{color:var(--ink3);font-size:13px;margin:8px 0 0}
@@ -151,7 +155,7 @@ footer{color:var(--ink3);font-size:12px;max-width:680px;margin:16px auto 0}
     <div class="top"><h1>Launches</h1><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
     <p class="intro">Every rocket going up around the world: what it’s carrying, who’s on board, when, and where to watch it live. Tap a launch for the details.</p>
   </header>
-  <div class="filters"><div class="seg" id="filter" role="group" aria-label="Show"><button data-f="all" class="on">All</button><button data-f="crew">With people on board</button><button data-f="week">Next 7 days</button></div><span class="note" id="tz"></span></div>
+  <div class="filters"><div class="fchips" id="filter" role="group" aria-label="Show"><button data-f="all" class="on">🚀 All <small id="n-all"></small></button><button data-f="crew">👩‍🚀 Crewed <small id="n-crew"></small></button><button data-f="week">📅 Next 7 days <small id="n-week"></small></button></div><span class="note" id="tz"></span></div>
   <div id="content"><section><p class="note">Loading the launch schedule…</p></section></div>
 </main>
 <footer>Schedule from <a href="https://thespacedevs.com/llapi" target="_blank" rel="noopener">The Space Devs’ Launch Library 2</a>, refreshed every hour. Launch times often change, sometimes minutes before liftoff: check here or the official webcast on the day. Trajectory simulations by <a href="https://flightclub.io" target="_blank" rel="noopener">FlightClub</a>. The flight direction on each map is our estimate from the target orbit, not an official flight plan.</footer>
@@ -351,6 +355,8 @@ function render(){ if(!data){ $('content').innerHTML='<section><p class="note">C
   if(hash) open.add(hash);
   CALENDAR.reset(); MAPS.length=0;
   const now=Date.now(); let up=data.upcoming.filter(l=>Date.parse(l.net)>now-6*36e5||['In Flight','Hold','Go'].includes(l.status.abbrev));
+  const counts={all:up.length,crew:up.filter(l=>crewOf(l).length).length,week:up.filter(l=>Date.parse(l.net)<now+7*864e5).length};
+  for(const k in counts){ const e=$('n-'+k); if(e) e.textContent=counts[k]; }
   if(filter==='crew') up=up.filter(l=>crewOf(l).length);
   if(filter==='week') up=up.filter(l=>Date.parse(l.net)<now+7*864e5);
   const next=data.upcoming.find(l=>exact(l)&&Date.parse(l.net)>now-36e5);

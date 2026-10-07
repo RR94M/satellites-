@@ -36,3 +36,12 @@ body.globe #app{position:fixed;left:0;right:0;top:0;bottom:calc(var(--tabh) + en
 .installhint button{flex:none;font:inherit;font-size:13px;border-radius:8px;padding:6px 10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
 .installhint button.go{background:var(--accent);border-color:var(--accent);color:var(--onaccent,#fff);font-weight:600}
 @media (min-width:900px){ .installhint{bottom:20px} }
+/* jump chips: a pinned row of icon chips with live values; tap to jump to a section */
+.jump{position:sticky;top:0;z-index:6;display:flex;min-width:0;max-width:100%;box-sizing:border-box;gap:6px;overflow-x:auto;scrollbar-width:none;padding:8px 0 10px;background:linear-gradient(var(--bg) 82%,transparent);-webkit-overflow-scrolling:touch}
+.jump::-webkit-scrollbar{display:none}
+.jump a{flex:none;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);text-decoration:none;font-size:13px;white-space:nowrap}
+.jump a small{color:var(--ink3);font-size:12px}
+.jump a.on{border-color:var(--accent);background:var(--panel2,var(--panel))}
+main:has(.jump){grid-template-columns:minmax(0,1fr)} /* a grid column would otherwise grow to fit the whole chip row */
+section{scroll-margin-top:62px}
+@media (min-width:900px){ .jump{top:var(--tabh)} section{scroll-margin-top:calc(var(--tabh) + 62px)} }
