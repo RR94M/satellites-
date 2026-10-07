@@ -333,7 +333,7 @@ try{
   D={groups:GROUPS.map(g=>g[1]).concat(['BeiDou']),sats,land:rings,epoch:/^\d{4}-\d\d-\d\dT\d\d:\d\dZ/.test(updated.trim())?updated.trim().replace('T',' ').replace('Z',' UTC'):new Date().toISOString().slice(0,10),metaDate:META?META.updated:null};
   document.getElementById('loading').remove();
 }catch(e){ msg('Could not load the catalogue: '+e.message+'. Check your connection and reload.'); throw e; }
-const G=D.groups, LAND=D.land;
+const G=D.groups; let LAND=D.land;
 function meta(m){ return m; }
 const css=getComputedStyle(document.documentElement);
 let cols=G.map((_,i)=>css.getPropertyValue('--c'+i).trim());
@@ -378,26 +378,30 @@ renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1)); renderer.setClea
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(45,1,0.05,500); camera.position.set(0,8,22);
 const controls=new THREE.OrbitControls(camera,renderer.domElement);
-controls.enableDamping=true; controls.dampingFactor=.08; controls.minDistance=R*1.08; controls.maxDistance=120; controls.enablePan=false; controls.rotateSpeed=.6;
+controls.enableDamping=true; controls.dampingFactor=.08; controls.minDistance=R*1.025; controls.maxDistance=120; controls.enablePan=false; controls.rotateSpeed=.6;
 controls.zoomSpeed=.8;
 
 // Earth texture drawn from embedded land polygons
 const THEMES={
-  dark:{ocean:'#071426',grid:'#15294A',land:'#6E5A3C',coast:'#D8BC8C',clear:0x0F1A2E,atmo:0x8CD1FF,atmoOp:.08,stars:.5,ambient:.8,sun:.55,
+  dark:{ocean:'#071426',grid:'#15294A',land:'#6E5A3C',coast:'#D8BC8C',border:'#A08A64',clear:0x0F1A2E,atmo:0x8CD1FF,atmoOp:.08,stars:.5,ambient:.8,sun:.55,
         sel:0xF2B340,fp:0xA9BAD2,you:0x7FE0C6,other:'#7489A8',outline:[0,0,0,0],night:[0.0,0.01,0.04,0.55]},
-  light:{ocean:'#9CC2E8',grid:'#B4D1EE',land:'#F4EEDD',coast:'#4E6585',clear:0xDCE6F2,atmo:0x2F74C0,atmoOp:.12,stars:0,ambient:.95,sun:.3,
+  light:{ocean:'#9CC2E8',grid:'#B4D1EE',land:'#F4EEDD',coast:'#4E6585',border:'#9AA6B8',clear:0xDCE6F2,atmo:0x2F74C0,atmoOp:.12,stars:0,ambient:.95,sun:.3,
         sel:0xB45309,fp:0x475569,you:0x0F766E,other:'#64748B',outline:[1,1,1,.95],night:[0.05,0.11,0.24,0.42]}};
 let TH=THEMES[document.documentElement.dataset.theme==='light'?'light':'dark'];
-function makeTexture(){ const w=4096,h=2048,c=document.createElement('canvas'); c.width=w;c.height=h; const g=c.getContext('2d');
+// computers get an 8192-wide map for a sharper land fill; phones keep 4096 to save memory (the crisp coastline lines do the rest)
+let coastLines=false;
+const TEXW=matchMedia('(pointer:fine)').matches&&renderer.capabilities.maxTextureSize>=8192?8192:4096;
+function makeTexture(){ const w=TEXW,h=TEXW/2,c=document.createElement('canvas'); c.width=w;c.height=h; const g=c.getContext('2d');
   g.fillStyle=TH.ocean; g.fillRect(0,0,w,h);
   g.strokeStyle=TH.grid; g.lineWidth=2;
   for(let lon=-180;lon<=180;lon+=30){const x=(lon+180)/360*w;g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
   for(let lat=-60;lat<=60;lat+=30){const y=(90-lat)/180*h;g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
   g.fillStyle=TH.land; g.beginPath();
   for(const ring of LAND){ ring.forEach((p,i)=>{const x=(p[0]+180)/360*w,y=(90-p[1])/180*h; i?g.lineTo(x,y):g.moveTo(x,y);}); g.closePath(); }
-  g.fill('evenodd'); g.strokeStyle=TH.coast; g.lineWidth=2.5; g.stroke();
+  g.fill('evenodd'); if(!coastLines){ g.strokeStyle=TH.coast; g.lineWidth=w/1640; g.stroke(); } // once the crisp coastline lines exist, the painted outline goes
   const t=new THREE.CanvasTexture(c); t.anisotropy=renderer.capabilities.getMaxAnisotropy(); return t; }
-const earth=new THREE.Mesh(new THREE.SphereGeometry(R,96,64),new THREE.MeshLambertMaterial({map:makeTexture()}));
+const coastMat=new THREE.LineBasicMaterial({color:TH.coast,transparent:true,opacity:.95}), borderMat=new THREE.LineBasicMaterial({color:TH.border,transparent:true,opacity:.6});
+const earth=new THREE.Mesh(new THREE.SphereGeometry(R,128,96),new THREE.MeshLambertMaterial({map:makeTexture()}));
 // No rotation needed: three.js puts the texture's centre (lon 0) on +x and lon 90E on -z, which already matches
 // toScene() below. (A -90° turn here once drew the whole map a quarter-turn east, e.g. the UK over Russia.)
 earth.userData.theme=TH===THEMES.light?'light':'dark';
@@ -767,6 +771,7 @@ function tick(force){ const fnow=performance.now(), dt=fnow-lastFrame; lastFrame
     const v=selMarker.position.clone().project(camera); const r=renderer.domElement.getBoundingClientRect(); const behind=v.z>1||(selMarker.position.length()<camera.position.length()&&camera.position.distanceTo(selMarker.position)>Math.sqrt(camera.position.lengthSq()-R*R)+Math.sqrt(Math.max(0,selMarker.position.lengthSq()-R*R)));
     label.style.display=behind?'none':'block'; selMarker.visible=!behind; label.style.left=((v.x+1)/2*r.width)+'px'; label.style.top=((1-v.y)/2*r.height)+'px'; }
   if(fly){ fly.t=Math.min(1,fly.t+0.03); const e=1-Math.pow(1-fly.t,3); camera.position.lerpVectors(fly.from,fly.to,e); if(fly.t>=1) fly=null; }
+  const alt=camera.position.length()-R, ms=Math.max(.12,Math.min(1,alt/(R*1.4))); youMarker.scale.setScalar(ms); youRing.scale.setScalar(ms); controls.rotateSpeed=Math.max(.03,Math.min(.6,.6*alt/(R*2))); controls.zoomSpeed=alt<R*.5?.5:.8;
   controls.update(); renderer.render(scene,camera); requestAnimationFrame(()=>tick(false)); }
 // display theme
 let themePref='auto'; try{ themePref=localStorage.getItem('ovh:theme')||'auto'; }catch(e){}
@@ -775,7 +780,7 @@ function applyTheme(){ const name=themePref==='auto'?(darkMq.matches?'light':'da
   if(earth.userData.theme!==name){ const old=earth.material.map; earth.material.map=makeTexture(); earth.material.needsUpdate=true; if(old) old.dispose(); earth.userData.theme=name; }
   renderer.setClearColor(TH.clear); atmo.material.color.setHex(TH.atmo); atmo.material.opacity=TH.atmoOp; starMat.opacity=TH.stars; amb.intensity=TH.ambient; sun.intensity=TH.sun;
   for(const m of [selMarker,trackLine,fpSel,cone,disc]) m.material.color.setHex(TH.sel); fpAll.material.color.setHex(TH.fp); youMarker.material.color.setHex(TH.you); youRing.material.color.setHex(TH.you);
-  mat.uniforms.outline.value.set(...TH.outline); night.material.uniforms.tint.value.set(...TH.night); drawAurora();
+  mat.uniforms.outline.value.set(...TH.outline); night.material.uniforms.tint.value.set(...TH.night); drawAurora(); coastMat.color.set(TH.coast); borderMat.color.set(TH.border);
   const cs=getComputedStyle(document.documentElement); cols=G.map((_,i)=>cs.getPropertyValue('--c'+i).trim());
   sats.forEach((s,i)=>{ const gi=s.groups.length?s.groups[0]:-1; const c=new THREE.Color(gi>=0?cols[gi]:TH.other); col.set([c.r,c.g,c.b],i*3); }); geo.attributes.color.needsUpdate=true;
   document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===themePref)); }
@@ -783,6 +788,17 @@ document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=
 darkMq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); });
 applyTheme();
 setAurBtn(); loadAurora(); setInterval(loadAurora,10*60e3);
+// ---------- sharper map: once the globe is up, swap in 50 km-detail land and draw the coastlines and country borders as
+// real lines (crisp at any zoom). Natural Earth data via world-atlas, public domain.
+function lineGeo(mesh,r){ const pos=[];
+  for(const line of mesh.coordinates) for(let i=1;i<line.length;i++){ const a=line[i-1], b=line[i]; if(Math.abs(a[0]-b[0])>180) continue;
+    const p=onSphere(a[1],a[0],r), q=onSphere(b[1],b[0],r); pos.push(p.x,p.y,p.z,q.x,q.y,q.z); }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); return g; }
+fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json').then(r=>r.ok?r.json():Promise.reject(r.status)).then(t=>{
+  const rings=[]; for(const f of topojson.feature(t,t.objects.land).features){ const cs=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates; for(const p of cs) for(const ring of p) rings.push(ring); }
+  LAND=rings; coastLines=true; const old=earth.material.map; earth.material.map=makeTexture(); earth.material.needsUpdate=true; if(old) old.dispose();
+  scene.add(new THREE.LineSegments(lineGeo(topojson.mesh(t,t.objects.countries,(a,b)=>a!==b),R*1.0005),borderMat));
+  scene.add(new THREE.LineSegments(lineGeo(topojson.mesh(t,t.objects.land),R*1.0007),coastMat)); }).catch(()=>{});
 // ---------- "What's that light?": point your phone at a moving light and see which satellite it probably is ----------
 (function(){
   const box=document.getElementById('light'), body=document.getElementById('lightBody'), D2R=Math.PI/180;
