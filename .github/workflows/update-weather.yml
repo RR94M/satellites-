@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   push:            # also run straight away when this workflow or its script changes
     branches: [main]
-    paths: ['.github/workflows/update-weather.yml', 'scripts/build_weather.py']
+    paths: ['.github/workflows/update-weather.yml', 'scripts/build_weather.py', 'scripts/build_space.py']
 
 permissions:
   contents: write
@@ -31,9 +31,10 @@ jobs:
           set -uo pipefail
           pip install -q pygrib numpy
           python3 scripts/build_weather.py out
+          python3 scripts/build_space.py out || echo "::warning::space weather not built"
           prev="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/weather"
           # if a source was down, keep the previous copy rather than losing the layer
-          for f in weather.json storms.json hazards.json quakes.json space-alerts.json volcanoes.json; do
+          for f in weather.json storms.json hazards.json quakes.json space-alerts.json volcanoes.json space.json; do
             [ -f "out/$f" ] || curl -sSf -o "out/$f" "$prev/$f" && echo "$f ready" || echo "::warning::$f unavailable"
           done
           ls -la out
