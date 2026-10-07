@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"></script>
 <script src="lib/tz-lookup.js"></script>
 <script src="lib/localtime.js"></script>
+<script src="lib/aurora.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
@@ -23,7 +24,7 @@
 :root{
   --bg:#0F1A2E; --panel:#1A2D4A; --panel2:#213858; --line:#2E4A72;
   --ink:#EAF0F8; --ink2:#A9BAD2; --ink3:#7489A8;
-  --accent:#F2B340; --onaccent:#0F1A2E; --you:#7FE0C6;
+  --accent:#F2B340; --onaccent:#0F1A2E; --you:#7FE0C6; --aurora:#46FF96;
   --space:#0F1A2E; --hud:#EAF0F8; --hud2:#A9BAD2; --hud3:#7489A8; --hudbtn:rgba(26,45,74,.85); --halo:#000; --veil:rgba(15,26,46,.75);
   --ok:#7FE0C6; --warn:#F2B340; --bad:#FF8FA3;
   --c0:#F2B340; --c1:#FFE9B0; --c2:#8CD1FF; --c3:#B49CFF; --c4:#FF9EC4; --c5:#7FE0C6;
@@ -34,7 +35,7 @@
 /* Light theme: pale sky around a daylight globe; satellite colours are the deep versions of the dark-theme hues */
 :root[data-theme="light"]{
   --bg:#E8EEF6; --panel:#FFFFFF; --panel2:#F1F5FA; --line:#C9D5E5;
-  --ink:#13223A; --ink2:#3E5476; --ink3:#5A6E8C; --accent:#B45309; --onaccent:#FFFFFF; --you:#0F766E;
+  --ink:#13223A; --ink2:#3E5476; --ink3:#5A6E8C; --accent:#B45309; --onaccent:#FFFFFF; --you:#0F766E; --aurora:#15803D;
   --space:#DCE6F2; --hud:#0F1A2E; --hud2:#3E5476; --hud3:#5A6E8C; --hudbtn:rgba(255,255,255,.92); --halo:#fff; --veil:rgba(232,238,246,.85);
   --ok:#0F766E; --warn:#B45309; --bad:#BE123C;
   --c0:#B45309; --c1:#A16207; --c2:#0369A1; --c3:#6D28D9; --c4:#BE185D; --c5:#047857;
@@ -112,6 +113,11 @@ button.on{border-color:var(--accent)}
 #you{display:none;color:var(--you);font-size:13px}
 .tonight{display:block;border:1px solid var(--accent);border-radius:8px;padding:9px 12px;color:var(--ink);text-decoration:none;font-size:14px}
 .tonight span{color:var(--accent);float:right}
+#aur{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--ink2)}
+#aur button{grid-row:span 2;padding:6px 10px}
+#aur button i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--aurora);margin-right:6px;vertical-align:0}
+#aur b{color:var(--ink)}
+#aur .note{grid-column:2}
 @media (min-width:900px){
   #app{grid-template-rows:1fr;grid-template-columns:1fr 340px}
   #panel{border-top:0;border-left:1px solid var(--line);max-height:none;align-content:start;padding-top:14px}
@@ -139,6 +145,7 @@ button.on{border-color:var(--accent)}
     </div>
     <div id="results"></div>
     <div id="you"></div>
+    <div id="aur"><button id="aurBtn" class="on" aria-pressed="true"><i></i>Aurora</button><div id="aurTxt">Loading the aurora forecast…</div><div class="note" id="aurKey"></div></div>
     <a class="tonight" href="tonight.html">Tonight’s sky: ISS sightings, satellite trains, aurora chance <span aria-hidden="true">→</span></a>
     <div class="row"><span class="note">Owned by</span><select id="country"><option value="">Any country or organisation</option></select></div>
     <div class="chips" id="chips"></div>
@@ -305,6 +312,50 @@ const night=new THREE.Mesh(new THREE.SphereGeometry(R*1.0015,96,64),new THREE.Sh
   vertexShader:'varying vec3 vN; void main(){ vN=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader:'uniform vec3 sunDir; uniform vec4 tint; varying vec3 vN; void main(){ float s=dot(normalize(vN),sunDir); float a=tint.a*smoothstep(0.02,-0.21,s); gl_FragColor=vec4(tint.rgb,a); }'}));
 night.renderOrder=1; scene.add(night);
+// aurora: NOAA's nowcast of where it's overhead (green, brighter = more likely), and the furthest-from-the-pole
+// line it can be seen from, low on the horizon, at the current Kp (dashed). See lib/aurora.js for the Kp maths.
+const NOAA='https://services.swpc.noaa.gov/json/', AUR_COPY='https://raw.githubusercontent.com/rr94-ai/satellites-/aurora/aurora.json';
+const aurCanvas=document.createElement('canvas'); aurCanvas.width=360; aurCanvas.height=180;
+const aurTex=new THREE.CanvasTexture(aurCanvas);
+const aurora=new THREE.Mesh(new THREE.SphereGeometry(R*1.003,96,64),new THREE.MeshBasicMaterial({map:aurTex,transparent:true,depthWrite:false}));
+aurora.renderOrder=1.5; scene.add(aurora);
+const viewMat=new THREE.LineDashedMaterial({color:0xE6FFEF,dashSize:.06,gapSize:.05,transparent:true,opacity:.95});
+const viewLines=new THREE.Group(); viewLines.renderOrder=1.6; scene.add(viewLines);
+let aurOn=true, aurData=null, kpAhead=null; try{ aurOn=localStorage.getItem('ovh:aurora')!=='off'; }catch(e){}
+function onSphere(lat,lon,r){ const a=lat*Math.PI/180, b=lon*Math.PI/180; return new THREE.Vector3(Math.cos(a)*Math.cos(b)*r,Math.sin(a)*r,-Math.cos(a)*Math.sin(b)*r); }
+function drawAurora(){ const g=aurCanvas.getContext('2d'), light=TH===THEMES.light; g.clearRect(0,0,360,180);
+  if(aurData) for(const [lon,lat,p] of aurData.points){ const a=Math.min(1,p/60)*(light?.7:.75); if(a<.04) continue;
+    g.fillStyle=(light?'rgba(21,128,61,':'rgba(70,255,150,')+a.toFixed(2)+')'; g.fillRect(((lon+180)%360+360)%360-.5,89.5-lat,1.6,1.6); }
+  aurTex.needsUpdate=true; viewMat.color.setHex(light?0x14532D:0xE6FFEF);
+  viewLines.children.slice().forEach(l=>{ viewLines.remove(l); l.geometry.dispose(); });
+  if(aurData&&isFinite(aurData.kp)){ const v=AURORA.viewLine(aurData.kp);
+    for(const pts of [v.north,v.south]) if(pts.length>1){ const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([la,lo])=>onSphere(la,lo,R*1.004))),viewMat); line.computeLineDistances(); viewLines.add(line); } }
+  aurora.visible=viewLines.visible=aurOn; describeAurora(); }
+function describeAurora(){ const t=document.getElementById('aurTxt'), k=document.getElementById('aurKey');
+  if(!aurData){ t.textContent='The aurora forecast isn’t available right now.'; k.textContent=''; return; }
+  const kp=aurData.kp, strongest=aurData.points.reduce((m,p)=>Math.max(m,p[2]),0);
+  let h=isFinite(kp)?'<b>Aurora now: Kp '+kp.toFixed(1)+'</b> ('+AURORA.level(kp)+')':'<b>Aurora now</b>';
+  if(me){ const lat=me.latitude*180/Math.PI, lon=me.longitude*180/Math.PI, need=AURORA.kpNeeded(lat,lon);
+    h+=need>=8.5?'. Too far from the aurora zone for you to see it, except in the very biggest storms.':isFinite(kp)&&kp>=need?'. <b>It could be visible from where you are</b> if your sky is dark and clear: look '+(lat>=0?'north':'south')+'.':'. You need about Kp '+need.toFixed(1)+' to see it from where you are.'; }
+  if(kpAhead&&kpAhead.kp>=(isFinite(kp)?kp+1:0)) h+=' Strongest in the next 3 days: Kp '+kpAhead.kp.toFixed(1)+', '+(me&&myTime?myTime.date(kpAhead.t,{weekday:'long'}):new Date(kpAhead.t).toLocaleDateString(undefined,{weekday:'long'}))+'.';
+  t.innerHTML=h;
+  k.textContent=!aurOn?'':aurData.noMap?'NOAA’s live aurora map didn’t load, so only the dashed line is shown: the furthest from the pole it can be seen, low on the horizon, at the forecast Kp.':(strongest<5?'Very little aurora right now. ':'Green shows where it’s overhead now (brighter is more likely). ')+(isFinite(kp)?'Dashed line: the furthest from the pole it can be seen, low on the horizon, at this Kp. ':'')+'Source: NOAA, updated every few minutes.'; }
+async function getJSON(u,ms){ const c=new AbortController(), t=setTimeout(()=>c.abort(),ms);
+  try{ const r=await fetch(u,{signal:c.signal,cache:'no-store'}); return r.ok?await r.json():null; }catch(e){ return null; }finally{ clearTimeout(t); } }
+async function loadAurora(){
+  // straight from NOAA when the browser allows it, otherwise this repo's copy (refreshed every 30 minutes)
+  const [ov,kp1,ahead]=await Promise.all([getJSON(NOAA+'ovation_aurora_latest.json',12000),getJSON(NOAA+'planetary_k_index_1m.json',12000),kpAhead?null:getJSON(DATA+'kp-forecast.json',12000)]);
+  let d=null;
+  if(ov&&Array.isArray(ov.coordinates)){ const last=Array.isArray(kp1)&&kp1.length?kp1[kp1.length-1]:null;
+    d={points:ov.coordinates.filter(c=>c[2]>=2),kp:last?+(last.estimated_kp!=null?last.estimated_kp:last.kp_index):NaN}; }
+  if(!d||!isFinite(d.kp)){ const c=await getJSON(AUR_COPY,12000); if(c&&Array.isArray(c.points)){ if(!d) d={points:c.points,kp:NaN}; if(c.kp!=null) d.kp=+c.kp; } }
+  if(Array.isArray(ahead)){ const now=Date.now(), slots=ahead.map(x=>({t:Date.parse(x.time_tag+'Z'),kp:+x.kp})).filter(x=>isFinite(x.t)&&isFinite(x.kp));
+    const cur=slots.filter(x=>x.t<=now&&x.t+3*36e5>now)[0]; if(!d&&cur) d={points:[],kp:NaN,noMap:true}; if(d&&!isFinite(d.kp)&&cur) d.kp=cur.kp;
+    kpAhead=slots.filter(x=>x.t+3*36e5>now&&x.t<now+3*864e5).reduce((m,x)=>!m||x.kp>m.kp?x:m,null); }
+  if(d||!aurData){ aurData=d; drawAurora(); } }
+const aurBtn=document.getElementById('aurBtn');
+function setAurBtn(){ aurBtn.classList.toggle('on',aurOn); aurBtn.setAttribute('aria-pressed',aurOn); aurora.visible=viewLines.visible=aurOn; describeAurora(); }
+aurBtn.onclick=()=>{ aurOn=!aurOn; try{ localStorage.setItem('ovh:aurora',aurOn?'on':'off'); }catch(e){} setAurBtn(); };
 const starMat=new THREE.PointsMaterial({color:0x9DB4D1,size:.5,sizeAttenuation:false,transparent:true,opacity:.5});
 (function(){ const n=1500,p=new Float32Array(n*3); for(let i=0;i<n;i++){ const u=Math.random()*2-1,th=Math.random()*6.2832,rr=Math.sqrt(1-u*u); const v=new THREE.Vector3(rr*Math.cos(th),u,rr*Math.sin(th)).multiplyScalar(300); p.set([v.x,v.y,v.z],i*3);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3)); scene.add(new THREE.Points(g,starMat)); })();
 
@@ -495,7 +546,7 @@ function whenLabel(t){ return myTime.when(t)+(myTime.same?'':' '+myTime.abbr); }
 const height=e=>e>=60?'almost overhead':e>=30?'high in the sky':'low in the sky';
 function nextIssSighting(){ const s=sats.find(x=>x.name.startsWith('ISS (ZARYA)')); if(!s) return ''; const r=sightings(s), p=r.list.find(x=>x.end>=Date.now())||r.next;
   if(!p) return 'The ISS won’t be visible from where you are for at least 4 weeks.';
-  return p.start<=Date.now()?'The ISS is visible right now: look '+compass(p.endAz)+'!':'Next time you can see the ISS: '+whenLabel(p.start).replace(/^T/,'t')+', look '+compass(p.startAz)+'.'; }
+  return p.start<=Date.now()?'The ISS is visible right now: look '+compass(p.endAz)+'!':'Next time you can see the ISS: '+whenLabel(p.start).replace(/^(Tonight|Tomorrow|This)/,w=>w.toLowerCase())+', look '+compass(p.startAz)+'.'; }
 function canSpot(s){ return s&&(s.groups.includes(0)||s.groups.includes(1)); } // stations and the "brightest objects" list
 function renderPasses(s){ const box=document.getElementById('passes'); if(!canSpot(s)){ box.style.display='none'; return; }
   let h='<h3>See it from where you are</h3>';
@@ -527,7 +578,7 @@ function requestLocation(){ if(!navigator.geolocation){you.style.display='block'
   you.style.display='block'; you.textContent='Finding you...';
   navigator.geolocation.getCurrentPosition(p=>{ me={latitude:p.coords.latitude*Math.PI/180,longitude:p.coords.longitude*Math.PI/180,height:(p.coords.altitude||0)/1000}; myTime=localTime(p.coords.latitude,p.coords.longitude);
       const ecf=satellite.geodeticToEcf(me); const qv=toScene(ecf); youMarker.position.set(qv[0],qv[1],qv[2]); youRing.position.copy(youMarker.position); youRing.lookAt(0,0,0); youMarker.visible=youRing.visible=true;
-      hb.style.display='inline-block'; flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4)); passCache.clear(); tick(true); renderPasses(sel); },
+      hb.style.display='inline-block'; flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4)); passCache.clear(); tick(true); renderPasses(sel); describeAurora(); },
    err=>{ you.textContent='Location was blocked, so the horizon filter and sightings are off. You can still track everything.'; },{timeout:10000}); }
 document.getElementById('locbtn').onclick=requestLocation;
 hb.onclick=()=>{ horizonOnly=!horizonOnly; hb.classList.toggle('on',horizonOnly); refresh(); };
@@ -551,13 +602,14 @@ function applyTheme(){ const name=themePref==='auto'?(darkMq.matches?'light':'da
   if(earth.userData.theme!==name){ const old=earth.material.map; earth.material.map=makeTexture(); earth.material.needsUpdate=true; if(old) old.dispose(); earth.userData.theme=name; }
   renderer.setClearColor(TH.clear); atmo.material.color.setHex(TH.atmo); atmo.material.opacity=TH.atmoOp; starMat.opacity=TH.stars; amb.intensity=TH.ambient; sun.intensity=TH.sun;
   for(const m of [selMarker,trackLine,fpSel,cone,disc]) m.material.color.setHex(TH.sel); fpAll.material.color.setHex(TH.fp); youMarker.material.color.setHex(TH.you); youRing.material.color.setHex(TH.you);
-  mat.uniforms.outline.value.set(...TH.outline); night.material.uniforms.tint.value.set(...TH.night);
+  mat.uniforms.outline.value.set(...TH.outline); night.material.uniforms.tint.value.set(...TH.night); drawAurora();
   const cs=getComputedStyle(document.documentElement); cols=G.map((_,i)=>cs.getPropertyValue('--c'+i).trim());
   sats.forEach((s,i)=>{ const gi=s.groups.length?s.groups[0]:-1; const c=new THREE.Color(gi>=0?cols[gi]:TH.other); col.set([c.r,c.g,c.b],i*3); }); geo.attributes.color.needsUpdate=true;
   document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===themePref)); }
 document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=b.dataset.t; try{ localStorage.setItem('ovh:theme',themePref); }catch(e){} applyTheme(); });
 darkMq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); });
 applyTheme();
+setAurBtn(); loadAurora(); setInterval(loadAurora,10*60e3);
 resize(); const iss=fromLink()||sats.find(s=>s.name.startsWith('ISS (ZARYA)')); tick(true); if(iss){ select(iss); camera.position.set(iss.x,iss.y,iss.z).normalize().multiplyScalar(22); }
 })();
 </script>

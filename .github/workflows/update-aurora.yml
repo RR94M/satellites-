@@ -1,0 +1,54 @@
+# Copies NOAA's aurora nowcast to the `aurora` branch every 30 minutes, as a backup for browsers that can't load it
+# from NOAA directly. Kept apart from the 6-hourly `data` branch so the two jobs never overwrite each other.
+name: Update aurora map
+
+on:
+  schedule:
+    - cron: '11,41 * * * *'
+  workflow_dispatch:
+  push:            # also run straight away when this workflow or its script changes
+    branches: [main]
+    paths: ['.github/workflows/update-aurora.yml', 'scripts/build_aurora.py']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-aurora
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      - name: Download from NOAA SWPC
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          get() {  # name url
+            for attempt in 1 2 3; do
+              code=$(curl -sS -o "out/$1" -w '%{http_code}' "$2") || code=000
+              if [ "$code" = 200 ] && python3 -c "import json,sys;json.load(open(sys.argv[1]))" "out/$1"; then echo "$1: ok"; return 0; fi
+              echo "::warning::$1 attempt $attempt got HTTP $code"; sleep 15
+            done
+            return 1
+          }
+          get ovation.json https://services.swpc.noaa.gov/json/ovation_aurora_latest.json
+          get kp-1m.json https://services.swpc.noaa.gov/json/planetary_k_index_1m.json || echo "::warning::no live Kp"
+          python3 scripts/build_aurora.py out
+          rm -f out/ovation.json out/kp-1m.json
+
+      - name: Publish to the aurora branch
+        run: |
+          set -euo pipefail
+          cd out
+          git init -q -b aurora
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Aurora nowcast $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" aurora
