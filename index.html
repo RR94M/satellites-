@@ -149,7 +149,24 @@ button.primary{background:var(--accent);color:var(--onaccent);border-color:var(-
 .haztag.minor .q{animation-duration:1.6s}
 @keyframes qflash{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes qring{from{transform:scale(1);opacity:.9}to{transform:scale(3.2);opacity:0}}
-@media (prefers-reduced-motion:reduce){.haztag .q,.haztag .q::after{animation:none}}
+/* volcanoes: a glowing triangle that throbs, with a puff rising */
+.haztag .vo{position:relative;display:block;width:16px;height:13px;background:linear-gradient(#FFB15A,#E8431F);clip-path:polygon(50% 0,100% 100%,0 100%);filter:drop-shadow(0 0 4px #FF6A2A);animation:vthrob 1.8s ease-in-out infinite}
+.haztag .vo-wrap{position:relative;display:block}
+.haztag .vo-wrap::before{content:'';position:absolute;left:50%;top:-4px;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:rgba(220,220,220,.8);animation:vpuff 2.4s ease-out infinite}
+@keyframes vthrob{0%,100%{filter:drop-shadow(0 0 3px #FF6A2A) brightness(1)}50%{filter:drop-shadow(0 0 9px #FF3B1F) brightness(1.3)}}
+@keyframes vpuff{0%{transform:translate(0,0) scale(.6);opacity:.9}100%{transform:translate(3px,-14px) scale(1.8);opacity:0}}
+/* wildfires: a flickering flame */
+.haztag .wf{display:block;font-size:14px;line-height:1;animation:flick .35s ease-in-out infinite alternate;transform-origin:50% 90%}
+@keyframes flick{0%{transform:scale(1,1) rotate(-3deg);opacity:1}100%{transform:scale(.92,1.1) rotate(3deg);opacity:.8}}
+/* floods: blue ripples spreading out */
+.haztag .fl{position:relative;display:block;width:9px;height:9px;border-radius:50%;background:#3BA7FF;box-shadow:0 0 6px #3BA7FF}
+.haztag .fl::before,.haztag .fl::after{content:'';position:absolute;inset:-1px;border-radius:50%;border:1.5px solid #3BA7FF;animation:qring 2.2s ease-out infinite}
+.haztag .fl::after{animation-delay:1.1s}
+/* droughts: a slow amber pulse */
+.haztag .dr{display:block;width:10px;height:10px;border-radius:50%;background:#E0A030;box-shadow:0 0 8px #E0A030;animation:qflash 3s ease-in-out infinite}
+.haztag.small span{display:none}
+.haztag.small:hover span{display:block}
+@media (prefers-reduced-motion:reduce){.haztag .q,.haztag .q::after,.haztag .vo,.haztag .vo-wrap::before,.haztag .wf,.haztag .fl::before,.haztag .fl::after,.haztag .dr{animation:none}}
 @keyframes spin{to{transform:rotate(-360deg)}}
 @media (prefers-reduced-motion:reduce){.stormtag i{animation:none}}
 #label{position:absolute;pointer-events:none;color:var(--accent);font-size:13px;font-weight:500;transform:translate(10px,-8px);white-space:nowrap;text-shadow:0 1px 3px var(--halo),0 0 2px var(--halo)}
@@ -293,7 +310,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     </div>
     <div id="aur"><button id="aurBtn" class="on" aria-pressed="true"><i></i>Aurora</button><div id="aurTxt">Loading the aurora forecast…</div><div class="note" id="aurKey"></div></div>
     <details class="more" id="layers" open><summary>Layers <small id="layerSum"></small></summary><div class="morebody">
-      <div class="grp"><h4>Earth weather</h4><div class="tog"><button data-layer="clouds"><i>☁️</i>Clouds</button><button data-layer="wind"><i>💨</i>Wind</button><button data-layer="storms"><i>🌀</i>Storms</button><button data-layer="hazards"><i>⚠️</i>Quakes &amp; disasters</button></div><div class="lnote" id="wxNote"></div><div id="stormList"></div></div>
+      <div class="grp"><h4>Earth weather</h4><div class="tog"><button data-layer="clouds"><i>☁️</i>Clouds</button><button data-layer="wind"><i>💨</i>Wind</button><button data-layer="storms"><i>🌀</i>Storms</button><button data-layer="hazards"><i>⚠️</i>Quakes, volcanoes &amp; disasters</button></div><div class="lnote" id="wxNote"></div><div id="stormList"></div></div>
       <div class="grp"><h4>Space</h4><div class="tog"><button data-layer="aurora"><i>🟢</i>Aurora</button><button data-layer="night"><i>🌗</i>Day &amp; night</button></div></div>
       <div class="grp"><h4>Map</h4><div class="tog"><button data-layer="borders"><i>🗺️</i>Country borders</button></div></div>
     </div></details>
@@ -922,15 +939,20 @@ async function loadStorms(){ try{ const r=await fetch(WX+'storms.json',{cache:'n
 // quakes and disasters: USGS earthquakes (magnitude 5+ this week, or with an impact alert) and current GDACS floods,
 // wildfires, volcanoes and droughts (orange/red alerts, plus every volcano)
 const hazTags=document.getElementById('hazTags'); let HAZ=null;
-async function loadHazards(){ const [q,h]=await Promise.all([fetch(WX+'quakes.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null),fetch(WX+'hazards.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null)]);
-  HAZ={quakes:q?q.quakes:[],other:h?h.hazards:[]}; drawHazards(); }
+async function loadHazards(){ const j=f=>fetch(WX+f,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null), [q,h,v]=await Promise.all([j('quakes.json'),j('hazards.json'),j('volcanoes.json')]);
+  const since=d=>d&&d.length===8?' since '+new Date(Date.UTC(+d.slice(0,4),+d.slice(4,6)-1,+d.slice(6,8)||1)).toLocaleDateString(undefined,{month:'short',year:'numeric'}):'';
+  HAZ={quakes:q?q.quakes:[],other:h?h.hazards.filter(x=>x.type!=='volcano'):[],
+    volcanoes:v?v.volcanoes.map(x=>({type:'volcano',name:x.name,lat:x.lat,lon:x.lon,detail:(x.erupting?'Erupting'+since(x.since):'Restless')+(x.usgs?' · USGS '+x.usgs.color+' / '+x.usgs.level:'')+(x.country?' · '+x.country:'')})):[]}; drawHazards(); }
 const HZICON={flood:'🌊',wildfire:'🔥',volcano:'🌋',drought:'🏜️'};
 function drawHazards(){ hazTags.innerHTML=''; if(!HAZ) return; const add=(lat,lon,html,title,cls,url)=>{ const t=document.createElement('div'); t.className='stormtag haztag'+(cls?' '+cls:''); t.innerHTML=html; t.title=title; t.pos=onSphere(lat,lon,R*1.004);
     t.onclick=()=>{ flyTo(onSphere(lat,lon,1).normalize().multiplyScalar(R*2.2)); }; hazTags.appendChild(t); };
   for(const q of HAZ.quakes){ if(q.lat==null||!(q.mag>=5||q.alert||q.tsunami)) continue; const px=Math.round(8+(q.mag-5)*5);
     add(q.lat,q.lon,'<i class="q" style="width:'+px+'px;height:'+px+'px"></i><span>M'+q.mag.toFixed(1)+'</span>','Magnitude '+q.mag.toFixed(1)+' earthquake: '+q.place+' ('+new Date(q.time).toLocaleString()+')',q.mag<6?'minor':''); }
-  for(const h of HAZ.other){ if(h.lat==null||!(h.alert!=='Green'||h.type==='volcano')) continue;
-    add(h.lat,h.lon,'<i>'+(HZICON[h.type]||'⚠️')+'</i><span>'+esc((h.country||h.name||'').split(',')[0])+'</span>',h.name+(h.detail?': '+h.detail:'')+' ('+h.alert+' alert)'); } }
+  const MARK={volcano:'<i class="vo-wrap"><i class="vo"></i></i>',wildfire:'<i class="wf">🔥</i>',flood:'<i class="fl"></i>',drought:'<i class="dr"></i>'};
+  for(const h of HAZ.other.concat(HAZ.volcanoes||[])){ if(h.lat==null) continue;
+    const label=h.type==='volcano'?(h.name||'Volcano'):(h.country||h.name||'').split(',')[0];
+    // green-alert fires are many and small: show the flame, with the name on hover
+    add(h.lat,h.lon,(MARK[h.type]||'<i>⚠️</i>')+'<span>'+esc(label)+'</span>',h.name+(h.detail?': '+h.detail:'')+(h.alert?' ('+h.alert+' alert)':''),h.type==='wildfire'&&h.alert==='Green'?'small':''); } }
 
 // the switches
 function layerNote(){ const n=document.getElementById('wxNote'), bits=[];

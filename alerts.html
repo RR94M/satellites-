@@ -91,7 +91,7 @@ footer{color:var(--ink3);font-size:12px;max-width:680px;margin:16px auto 0}
   </header>
   <div id="content"><section><p class="note">Loading the latest alerts…</p></section></div>
 </main>
-<footer>Alerts are for interest and awareness, not official warnings: for your safety, follow your national weather service and civil protection. Sources: <a href="https://www.gdacs.org" target="_blank" rel="noopener">GDACS</a> (European Commission and UN) for storms and disasters, <a href="https://earthquake.usgs.gov" target="_blank" rel="noopener">USGS</a> for earthquakes, <a href="https://www.swpc.noaa.gov" target="_blank" rel="noopener">NOAA Space Weather Prediction Center</a> for space weather, and this site’s own sightings, aurora and launch data. Checked every hour. Your location stays on your device.</footer>
+<footer>Alerts are for interest and awareness, not official warnings: for your safety, follow your national weather service and civil protection. Sources: <a href="https://www.gdacs.org" target="_blank" rel="noopener">GDACS</a> (European Commission and UN) for storms and disasters, <a href="https://earthquake.usgs.gov" target="_blank" rel="noopener">USGS</a> for earthquakes and US volcano alerts, the <a href="https://volcano.si.edu" target="_blank" rel="noopener">Smithsonian Global Volcanism Program</a> for volcanoes erupting worldwide, <a href="https://www.swpc.noaa.gov" target="_blank" rel="noopener">NOAA Space Weather Prediction Center</a> for space weather, and this site’s own sightings, aurora and launch data. Checked every hour. Your location stays on your device.</footer>
 <script>
 (async function(){
 const DATA='https://raw.githubusercontent.com/RR94M/satellites-/data/', WX='https://raw.githubusercontent.com/RR94M/satellites-/weather/', LAUNCH='https://raw.githubusercontent.com/RR94M/satellites-/launches/';
@@ -134,8 +134,8 @@ function item(ic,title,detail,meta,acts){ return '<div class="al"><span class="i
 // ---------- data ----------
 const get=(u,type)=>fetch(u,{cache:'no-store'}).then(r=>r.ok?(type==='text'?r.text():r.json()):null).catch(()=>null);
 let D={};
-async function load(){ const [storms,quakes,haz,space,kp,launches,tle]=await Promise.all([get(WX+'storms.json'),get(WX+'quakes.json'),get(WX+'hazards.json'),get(WX+'space-alerts.json'),get(DATA+'kp-forecast.json'),get(LAUNCH+'launches.json'),get(DATA+'stations.tle','text')]);
-  D={storms,quakes,haz,space,kp,launches,tle}; }
+async function load(){ const [storms,quakes,haz,space,kp,launches,tle,vols]=await Promise.all([get(WX+'storms.json'),get(WX+'quakes.json'),get(WX+'hazards.json'),get(WX+'space-alerts.json'),get(DATA+'kp-forecast.json'),get(LAUNCH+'launches.json'),get(DATA+'stations.tle','text'),get(WX+'volcanoes.json')]);
+  D={storms,quakes,haz,space,kp,launches,tle,vols}; }
 
 // ---------- 1. for you ----------
 function forYou(){ if(!loc) return '<section><h2>For you</h2><p class="sub">Share your location above to see what’s worth knowing where you are: sightings, aurora chances, launches you might see, and storms or earthquakes nearby.</p></section>';
@@ -160,10 +160,13 @@ function forYou(){ if(!loc) return '<section><h2>For you</h2><p class="sub">Shar
       if(best&&best.d<800) out.push({t:best.t||now,lvl:0,html:item('🌀',esc(s.name)+' '+(best.t?'is forecast to pass within '+near(best.d).toLocaleString()+' km of you on '+fmt(best.t,{weekday:'long'}):'is '+near(best.d).toLocaleString()+' km from you'),esc(cap(s.now||''))+(s.peak?' now; forecast to peak as a '+esc(s.peak):'')+'. Follow your local weather service’s warnings.','',globe(s.at[1],s.at[0]))}); } }
   // earthquakes near you in the past 2 days
   if(D.quakes){ for(const q of D.quakes.quakes){ if(q.time<now-2*864e5||q.lat==null) continue; const d=km(L.lat,L.lon,q.lat,q.lon);
-      if(d<1000||(q.mag>=6.5&&d<2500)) out.push({t:q.time,lvl:q.mag>=6?0:1,html:item('🌍','Magnitude '+q.mag.toFixed(1)+' earthquake '+near(d).toLocaleString()+' km from you',esc(q.place)+(q.tsunami?'. A tsunami message was issued; check official sources.':'.'),ago(q.time),globe(q.lat,q.lon)+' · <a href="'+esc(q.url)+'" target="_blank" rel="noopener">USGS details</a>')}); } }
+      if(d<1000||(q.mag>=6.5&&d<2500)) out.push({t:q.time,lvl:q.mag>=6&&d<1000?0:d<300||q.mag>=6?1:2,html:item('🌍','Magnitude '+q.mag.toFixed(1)+' earthquake '+near(d).toLocaleString()+' km from you',esc(q.place)+(q.tsunami?'. A tsunami message was issued; check official sources.':'.'),ago(q.time),globe(q.lat,q.lon)+' · <a href="'+esc(q.url)+'" target="_blank" rel="noopener">USGS details</a>')}); } }
   // floods, fires and volcanoes nearby
   if(D.haz){ for(const h of D.haz.hazards){ if(h.lat==null) continue; const d=km(L.lat,L.lon,h.lat,h.lon); if(d<(h.type==='volcano'?500:300))
       out.push({t:Date.parse(h.to+'Z')||now,lvl:h.alert==='Red'?0:h.alert==='Orange'?1:2,html:item(ICON[h.type],esc(h.name)+', '+near(d).toLocaleString()+' km from you',esc(h.detail||''),'',globe(h.lat,h.lon))}); } }
+  // erupting volcanoes within 500 km
+  if(D.vols){ for(const v of D.vols.volcanoes){ if(v.lat==null) continue; const d=km(L.lat,L.lon,v.lat,v.lon); if(d<500)
+      out.push({t:now,lvl:v.usgs&&/red|orange/i.test(v.usgs.color)?0:1,html:item('🌋',esc(v.name)+' is '+(v.erupting?'erupting':'restless')+', '+near(d).toLocaleString()+' km from you',v.erupting?'Erupting'+sinceTxt(v.since)+'. Ash can drift a long way: check local advice.':'Showing signs of unrest.','',globe(v.lat,v.lon)+' · <a href="'+esc(v.url)+'" target="_blank" rel="noopener">Smithsonian page</a>')}); } }
   out.sort((a,b)=>a.lvl-b.lvl||a.t-b.t);
   return '<section><h2>For you</h2><p class="sub">What’s worth knowing near '+esc(WHERE.label(loc))+' in the next day or so.</p>'
     +(out.length?out.map(x=>x.html).join(''):'<p class="note">Nothing near you right now. We check for sightings, aurora, launches, storms, earthquakes, floods, wildfires and volcanoes.</p>')+'</section>'; }
@@ -176,9 +179,14 @@ function worldItems(){ const out=[]; const now=Date.now();
   if(D.quakes) for(const q of D.quakes.quakes){ if(q.lat==null) continue; const big=q.mag>=5.5||q.alert||q.tsunami; if(!big&&!(q.mag>=4.5&&q.time>now-864e5)) continue;
     const level=q.alert||(q.mag>=7?'red':q.mag>=6?'orange':null);
     out.push({type:'earthquake',rank:level==='red'?0:level==='orange'||level==='yellow'?1:2,t:q.time,html:item('🌍','Magnitude '+q.mag.toFixed(1)+' · '+esc(q.place)+lvl(level),'Depth '+Math.round(q.depth)+' km'+(q.tsunami?' · tsunami message issued':'')+(q.felt?' · felt by '+q.felt.toLocaleString()+' people':''),ago(q.time),globe(q.lat,q.lon)+' · <a href="'+esc(q.url)+'" target="_blank" rel="noopener">USGS details</a>')}); }
-  if(D.haz) for(const h of D.haz.hazards) out.push({type:h.type,rank:{Red:0,Orange:1,Green:2}[h.alert]??2,t:Date.parse((h.to||'')+'Z')||0,html:item(ICON[h.type]||'⚠️',esc(h.name)+lvl(h.alert),esc(h.detail||''),h.from?'Since '+fmt(Date.parse(h.from+'Z'),{day:'numeric',month:'short'}):'',h.lat!=null?globe(h.lat,h.lon)+(h.report?' · <a href="'+esc(h.report)+'" target="_blank" rel="noopener">GDACS report</a>':''):'')});
+  if(D.vols) for(const v of D.vols.volcanoes){ if(v.lat==null) continue; const u=v.usgs, lv=u&&u.color?u.color.toLowerCase():null;
+    out.push({type:'volcano',rank:lv==='red'?0:lv==='orange'?1:2,t:0,html:item('🌋',esc(v.name)+(v.country?' · '+esc(v.country):'')+(u?'<span class="lvl '+(lv==='red'?'red':lv==='orange'?'orange':'green')+'">USGS '+esc(u.color)+'</span>':''),
+      (v.erupting?'Erupting'+sinceTxt(v.since):'Restless, not erupting')+(v.vei!=null?' · explosivity '+v.vei+' of 8':'')+(u?' · '+esc(u.level)+' from the '+esc(u.observatory||'USGS'):''),'',
+      globe(v.lat,v.lon)+' · <a href="'+esc(v.url)+'" target="_blank" rel="noopener">Smithsonian page</a>'+(u&&u.url?' · <a href="'+esc(u.url)+'" target="_blank" rel="noopener">USGS notice</a>':''))}); }
+  if(D.haz) for(const h of D.haz.hazards) if(h.type!=='volcano') out.push({type:h.type,rank:{Red:0,Orange:1,Green:2}[h.alert]??2,t:Date.parse((h.to||'')+'Z')||0,html:item(ICON[h.type]||'⚠️',esc(h.name)+lvl(h.alert),esc(h.detail||''),h.from?'Since '+fmt(Date.parse(h.from+'Z'),{day:'numeric',month:'short'}):'',h.lat!=null?globe(h.lat,h.lon)+(h.report?' · <a href="'+esc(h.report)+'" target="_blank" rel="noopener">GDACS report</a>':''):'')});
   return out; }
 const cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
+const sinceTxt=d=>d&&d.length===8?' since '+new Date(Date.UTC(+d.slice(0,4),+d.slice(4,6)-1,+d.slice(6,8)||1)).toLocaleDateString(undefined,{month:'long',year:'numeric'}):'';
 function world(){ const all=worldItems(), counts={}; all.forEach(x=>counts[x.type]=(counts[x.type]||0)+1);
   let list=wfilter==='all'?all:all.filter(x=>x.type===wfilter); list.sort((a,b)=>a.rank-b.rank||b.t-a.t);
   const LIMIT=12, shown=showAll?list:list.slice(0,LIMIT);
