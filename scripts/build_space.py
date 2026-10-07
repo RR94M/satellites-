@@ -21,19 +21,31 @@ SWPC = "https://services.swpc.noaa.gov/"
 
 def get(url, tries=3):
     for attempt in range(tries):
+        raw = b""
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60) as r:
-                return json.loads(r.read().decode("utf-8"))
+                raw = r.read()
+            return json.loads(raw.decode("utf-8"))
         except Exception as e:  # noqa: BLE001
-            print(f"  attempt {attempt + 1} failed for {url[:110]}: {e}")
+            print(f"  attempt {attempt + 1} failed for {url[:110]}: {e} {raw[:160]!r}")
+            if "404" in str(e): return None
             time.sleep(8)
     return None
 
 
+def first(*urls):
+    for u in urls:
+        d = get(u, tries=2)
+        if d: print("  using", u); return d
+    return None
+
+
 def table(rows):
-    """NOAA 'products' files are a header row followed by rows of strings."""
-    if not rows or not isinstance(rows, list) or not isinstance(rows[0], list):
+    """NOAA files come either as a header row followed by rows, or as a list of objects."""
+    if not rows or not isinstance(rows, list):
         return []
+    if isinstance(rows[0], dict):
+        return rows
     head = rows[0]
     return [dict(zip(head, r)) for r in rows[1:]]
 
@@ -52,19 +64,24 @@ def main(d):
     out["scales"] = get(SWPC + "products/noaa-scales.json")
 
     kp = table(get(SWPC + "products/noaa-planetary-k-index.json"))
-    out["kp"] = [[r.get("time_tag"), num(r.get("Kp"))] for r in kp if num(r.get("Kp")) is not None]
+    kpv = lambda r: num(r.get("Kp", r.get("kp", r.get("kp_index"))))
+    out["kp"] = [[r.get("time_tag"), kpv(r)] for r in kp if kpv(r) is not None]
     fc = get(SWPC + "products/noaa-planetary-k-index-forecast.json")
     rows = fc if fc and isinstance(fc[0], dict) else table(fc)
     out["kpForecast"] = [[r.get("time_tag"), num(r.get("kp")), r.get("observed")] for r in rows or [] if num(r.get("kp")) is not None]
 
-    plasma = {r["time_tag"][:16]: r for r in table(get(SWPC + "products/solar-wind/plasma-1-day.json"))}
-    mag = {r["time_tag"][:16]: r for r in table(get(SWPC + "products/solar-wind/mag-1-day.json"))}
+    plasma = {r["time_tag"][:16].replace(" ", "T"): r for r in table(first(SWPC + "products/solar-wind/plasma-1-day.json", SWPC + "json/rtsw/rtsw_wind_1m.json")) if r.get("time_tag")}
+    mag = {r["time_tag"][:16].replace(" ", "T"): r for r in table(first(SWPC + "products/solar-wind/mag-1-day.json", SWPC + "json/rtsw/rtsw_mag_1m.json")) if r.get("time_tag")}
+    if plasma: print("  plasma fields:", list(next(iter(plasma.values())).keys()))
+    if mag: print("  mag fields:", list(next(iter(mag.values())).keys()))
+    pick = lambda r, *ks: next((num(r.get(k)) for k in ks if num(r.get(k)) is not None), None)
+    cut = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
     wind = []
     for t in sorted(set(plasma) | set(mag)):
-        if t[-1] != "0":  # one sample every 10 minutes keeps the file small
+        if t[-1] != "0" or t < cut:  # one sample every 10 minutes over the past day keeps the file small
             continue
         p, m = plasma.get(t, {}), mag.get(t, {})
-        wind.append([t, num(p.get("speed")), num(p.get("density")), num(m.get("bz_gsm")), num(m.get("bt"))])
+        wind.append([t, pick(p, "speed", "proton_speed"), pick(p, "density", "proton_density"), pick(m, "bz_gsm", "bz"), pick(m, "bt")])
     out["wind"] = wind
 
     xr = get(SWPC + "json/goes/primary/xrays-1-day.json") or []
