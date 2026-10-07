@@ -275,17 +275,25 @@ def space_alerts(directory):
 
 
 def volcanoes(directory):
-    """Volcanoes erupting or restless this week, from the Smithsonian/USGS Weekly Volcanic Activity Report."""
-    req = urllib.request.Request("https://volcano.si.edu/news/WeeklyVolcanoRSS.xml", headers=UA)
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            raw = r.read().decode("utf-8", "replace")
-    except Exception as e:  # noqa: BLE001
-        print("::warning::no GVP weekly report:", e)
-        return
-    with open(f"{directory}/gvp-weekly.xml", "w", encoding="utf-8") as f:
-        f.write(raw)
-    print("gvp-weekly.xml:", len(raw), "bytes")
+    """Exploring sources for currently active volcanoes: save what each returns."""
+    browser = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
+               "Accept": "application/rss+xml, application/xml, application/json, */*"}
+    tries = {
+        "gvp-weekly.xml": "https://volcano.si.edu/news/WeeklyVolcanoRSS.xml",
+        "gvp-wfs-eruptions.json": "https://webservices.volcano.si.edu/geoserver/GVP-VOTW/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=GVP-VOTW:E3WebApp_Eruptions1960&outputFormat=application/json&maxFeatures=5000",
+        "gvp-wfs-caps.xml": "https://webservices.volcano.si.edu/geoserver/GVP-VOTW/ows?service=WFS&version=1.0.0&request=GetCapabilities",
+        "usgs-elevated.json": "https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes",
+        "usgs-cap.json": "https://volcanoes.usgs.gov/hans-public/api/volcano/getCapElevated",
+    }
+    for name, url in tries.items():
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=browser), timeout=60) as r:
+                raw = r.read()
+            with open(f"{directory}/{name}", "wb") as f:
+                f.write(raw)
+            print(f"volcano source {name}: OK {len(raw)} bytes: {raw[:160]!r}")
+        except Exception as e:  # noqa: BLE001
+            print(f"volcano source {name}: failed: {e}")
 
 
 if __name__ == "__main__":
