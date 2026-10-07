@@ -3,7 +3,6 @@
 Writes into the directory given as argv[1]:
   weather.json  1-degree grids of total cloud cover (%) and 10 m wind (m/s), packed as base64 bytes
   storms.json   active tropical storms/hurricanes/typhoons worldwide: position, strength, past and forecast track
-Raw GDACS responses are kept alongside (gdacs-*.json) so problems can be checked.
 
 GFS is a US government product (public domain). GDACS is run by the European Commission's JRC with the UN.
 """
@@ -84,29 +83,113 @@ def gfs(directory):
 
 
 # ---------------------------------------------------------------- GDACS: tropical cyclones
-def storms(directory):
-    events = get("https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP")
-    with open(f"{directory}/gdacs-events.json", "w") as f:
-        json.dump(events, f)
+# The same kind of storm has a different name by ocean
+def kind(lon, lat):
+    if lon is None: return "hurricane"
+    if 100 <= lon <= 180 and lat > 0: return "typhoon"
+    if (lon < -20 or lon > 180) and lat > 0: return "hurricane"  # Atlantic and east/central Pacific
+    return "cyclone"
+
+
+def strength(kmh, word):
+    """Saffir-Simpson style class from maximum sustained wind (km/h)."""
+    if kmh is None: return None
+    for limit, cat in ((252, 5), (209, 4), (178, 3), (154, 2), (119, 1)):
+        if kmh >= limit: return f"Category {cat} {word}"
+    return "tropical storm" if kmh >= 63 else "tropical depression"
+
+
+CLASS = {"TD": "tropical depression", "TS": "tropical storm", "STS": "severe tropical storm", "HU": None, "TY": None, "STY": None,
+         "SS": "subtropical storm", "SD": "subtropical depression", "EX": "post-tropical storm", "LO": "remnant low", "DB": "disturbance"}
+
+
+def thin(ring, keep=80):
+    step = max(1, len(ring) // keep)
+    out = [[round(x, 2), round(y, 2)] for x, y in ring[::step]]
+    return out if out[-1] == out[0] else out + [out[0]]
+
+
+def parse_storm(feat, geom):
+    p = feat.get("properties", {})
+    here = (feat.get("geometry") or {}).get("coordinates")
+    sev = p.get("severitydata") or {}
+    kmh = sev.get("severity") if (sev.get("severityunit") or "").startswith("km") else None
+    segs, cone, winds, times = [], None, {}, []
+    for f in (geom or {}).get("features", []):
+        g, q = f.get("geometry") or {}, f.get("properties") or {}
+        label = q.get("polygonlabel") or ""
+        if g.get("type") == "LineString" and len(g.get("coordinates", [])) >= 2:
+            segs.append((label, [tuple(c[:2]) for c in g["coordinates"]]))
+        elif g.get("type") == "Polygon" and label == "Uncertainty Cones":
+            cone = thin(g["coordinates"][0], 120)
+        elif g.get("type") == "Polygon" and label.endswith("km/h"):
+            winds[label] = thin(g["coordinates"][0], 60)
+        elif g.get("type") == "Polygon" and label.endswith("UTC"):  # a forecast position (circle) with its time
+            ring = g["coordinates"][0]
+            cx, cy = sum(c[0] for c in ring) / len(ring), sum(c[1] for c in ring) / len(ring)
+            year = (q.get("polygondate") or "2000")[:4]
+            try:
+                t = datetime.strptime(year + " " + label.replace(" UTC", ""), "%Y %d/%m %H:%M").replace(tzinfo=timezone.utc)
+                times.append((t, (cx, cy)))
+            except ValueError:
+                pass
+    # join the short track pieces into one line, start to finish
+    starts = {seg[1][0]: seg for seg in segs}
+    ends = {seg[1][-1] for seg in segs}
+    first = next((seg for seg in segs if seg[1][0] not in ends), segs[0] if segs else None)
+    track, seen = [], set()
+    seg = first
+    while seg and id(seg) not in seen:
+        seen.add(id(seg))
+        cls, pts = seg
+        if not track: track.append([pts[0][0], pts[0][1], cls])
+        for pt in pts[1:]: track.append([pt[0], pt[1], cls])
+        seg = starts.get(pts[-1])
+    # split at the storm's current position: what's behind it happened, what's ahead is forecast
+    now_i = 0
+    if here and track:
+        now_i = min(range(len(track)), key=lambda i: (track[i][0] - here[0]) ** 2 + (track[i][1] - here[1]) ** 2)
+    for t, (cx, cy) in times:  # put forecast times on the nearest forecast points
+        if track[now_i:]:
+            k = min(range(now_i, len(track)), key=lambda i: (track[i][0] - cx) ** 2 + (track[i][1] - cy) ** 2)
+            if len(track[k]) == 3: track[k].append(t.strftime("%Y-%m-%dT%H:%MZ"))
+    name = (p.get("eventname") or p.get("name") or "Storm").rsplit("-", 1)[0].replace("Tropical Cyclone ", "").title()
+    word = kind(*(here or [None, None]))
+    cls = track[now_i][2] if track else None   # GDACS's wind figure is the forecast peak, so "now" comes from the track class
+    now_name = CLASS.get(cls, None) if cls in CLASS else None
+    if now_name is None: now_name = word if cls in ("HU", "TY", "STY") else (strength(kmh, word) or "tropical storm")
+    countries = [c.get("countryname") for c in p.get("affectedcountries") or [] if c.get("countryname")]
+    return {
+        "id": p.get("eventid"), "name": name, "kind": word, "now": now_name, "alert": p.get("alertlevel"),
+        "peakKmh": round(kmh) if kmh else None, "peak": strength(kmh, word), "at": here, "updated": p.get("todate"),
+        "countries": countries or ([p.get("country")] if p.get("country") else []),
+        "past": [t[:3] for t in track[:now_i + 1]], "forecast": [t if len(t) == 4 else t[:3] for t in track[now_i:]],
+        "cone": cone, "wind60": winds.get("60 km/h"), "wind120": winds.get("120 km/h"),
+        "report": (p.get("url") or {}).get("report"),
+    }
+
+
+def storms(directory, events=None, geometry=None):
+    events = events if events is not None else get("https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP")
     if not events:
         print("::warning::no GDACS event list")
         return
     out = []
     for feat in events.get("features", []):
         p = feat.get("properties", {})
-        if p.get("eventtype") != "TC":
+        if p.get("eventtype") != "TC" or str(p.get("iscurrent")).lower() != "true":
             continue
-        geo_url = (p.get("url") or {}).get("geometry")
-        geom = get(geo_url) if geo_url else None
-        with open(f"{directory}/gdacs-{p.get('eventid')}.json", "w") as f:
-            json.dump(geom, f)
-        out.append({"id": p.get("eventid"), "episode": p.get("episodeid"), "name": p.get("name") or p.get("eventname"),
-                    "alert": p.get("alertlevel"), "severity": p.get("severitydata"), "from": p.get("fromdate"), "to": p.get("todate"),
-                    "current": p.get("iscurrent"), "country": p.get("country"), "point": (feat.get("geometry") or {}).get("coordinates"),
-                    "geometryUrl": geo_url, "report": (p.get("url") or {}).get("report")})
-    with open(f"{directory}/storms-raw.json", "w") as f:
-        json.dump({"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "storms": out}, f)
-    print(f"GDACS: {len(out)} tropical cyclone event(s): " + ", ".join(str(s['name']) for s in out))
+        url = (p.get("url") or {}).get("geometry")
+        geom = geometry(p) if geometry else (get(url) if url else None)
+        try:
+            out.append(parse_storm(feat, geom))
+        except Exception as e:  # noqa: BLE001 - one odd storm shouldn't lose the others
+            print(f"::warning::could not read storm {p.get('eventname')}: {e}")
+    out.sort(key=lambda s: -(s["peakKmh"] or 0))
+    with open(f"{directory}/storms.json", "w") as f:
+        json.dump({"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "source": "GDACS (European Commission JRC and UN)", "storms": out},
+                  f, separators=(",", ":"))
+    print(f"storms.json: {len(out)} storm(s): " + ", ".join(f"{s['name']} ({s['now']} now, peak {s['peak']} {s['peakKmh']} km/h, {len(s['past'])}+{len(s['forecast'])} pts)" for s in out))
 
 
 if __name__ == "__main__":
