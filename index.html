@@ -10,6 +10,8 @@
 <meta property="og:type" content="website">
 <script>try{var p=localStorage.getItem('ovh:theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p}catch(e){document.documentElement.dataset.theme='dark'}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"></script>
+<script src="lib/tz-lookup.js"></script>
+<script src="lib/localtime.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
@@ -488,10 +490,8 @@ function sightings(s){ if(!me) return {list:[],over:0,next:null};
   }
   if(cur&&!next){ if(cur.start<listEnd&&list.length<5) list.push(cur); else next=cur; }
   const res={list,over,next}; passCache.set(key,res); return res; }
-function whenLabel(t){ const d=new Date(t), n=new Date(), day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
-  const diff=Math.round((day(d)-day(n))/864e5), am=d.getHours()<12, time=d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
-  const name=diff===0?(am?'This morning':'Tonight'):diff===1?(am?'Tomorrow morning':'Tomorrow evening'):d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'});
-  return name+' '+time; }
+let myTime=null; // sighting times are shown in the time zone where you are standing, not the phone's setting
+function whenLabel(t){ return myTime.when(t)+(myTime.same?'':' '+myTime.abbr); }
 const height=e=>e>=60?'almost overhead':e>=30?'high in the sky':'low in the sky';
 function nextIssSighting(){ const s=sats.find(x=>x.name.startsWith('ISS (ZARYA)')); if(!s) return ''; const r=sightings(s), p=r.list.find(x=>x.end>=Date.now())||r.next;
   if(!p) return 'The ISS won’t be visible from where you are for at least 4 weeks.';
@@ -525,7 +525,7 @@ function fromLink(){ const id=(location.hash.match(/^#(\d{1,6})$/)||[])[1]; retu
 const you=document.getElementById('you'), hb=document.getElementById('horizon');
 function requestLocation(){ if(!navigator.geolocation){you.style.display='block';you.textContent='Location is not available in this browser.';return;}
   you.style.display='block'; you.textContent='Finding you...';
-  navigator.geolocation.getCurrentPosition(p=>{ me={latitude:p.coords.latitude*Math.PI/180,longitude:p.coords.longitude*Math.PI/180,height:(p.coords.altitude||0)/1000};
+  navigator.geolocation.getCurrentPosition(p=>{ me={latitude:p.coords.latitude*Math.PI/180,longitude:p.coords.longitude*Math.PI/180,height:(p.coords.altitude||0)/1000}; myTime=localTime(p.coords.latitude,p.coords.longitude);
       const ecf=satellite.geodeticToEcf(me); const qv=toScene(ecf); youMarker.position.set(qv[0],qv[1],qv[2]); youRing.position.copy(youMarker.position); youRing.lookAt(0,0,0); youMarker.visible=youRing.visible=true;
       hb.style.display='inline-block'; flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4)); passCache.clear(); tick(true); renderPasses(sel); },
    err=>{ you.textContent='Location was blocked, so the horizon filter and sightings are off. You can still track everything.'; },{timeout:10000}); }

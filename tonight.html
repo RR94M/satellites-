@@ -10,6 +10,8 @@
 <meta property="og:description" content="The ISS, satellite trains and aurora chances for where you are, tonight.">
 <meta property="og:type" content="website">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"></script>
+<script src="lib/tz-lookup.js"></script>
+<script src="lib/localtime.js"></script>
 <style>
 /* Space Grotesk, self-hosted (SIL Open Font License, see fonts/OFL.txt) */
 @font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
@@ -108,7 +110,8 @@ mq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); }); appl
 let loc=null; try{ loc=JSON.parse(localStorage.getItem('ovh:loc')||'null'); }catch(e){}
 function setWhere(){ const w=$('where');
   if(!loc){ w.innerHTML='Share your location to see what passes over you. <button class="primary" id="locate">Use my location</button>'; $('locate').onclick=locate; return; }
-  w.innerHTML='Near '+Math.abs(loc.lat).toFixed(1)+'°'+(loc.lat>=0?'N':'S')+', '+Math.abs(loc.lon).toFixed(1)+'°'+(loc.lon>=0?'E':'W')+' · saved on this device only · <button class="link" id="relocate">Update</button> · <button class="link" id="forget">Forget</button>';
+  w.innerHTML='Near '+Math.abs(loc.lat).toFixed(1)+'°'+(loc.lat>=0?'N':'S')+', '+Math.abs(loc.lon).toFixed(1)+'°'+(loc.lon>=0?'E':'W')+' · saved on this device only · '
+    +(LT.same?'times in '+esc(LT.abbr):'<b>times are local there ('+esc(LT.zone.replace(/_/g,' ')+', '+LT.abbr)+')</b>, not your phone’s time zone')+' · <button class="link" id="relocate">Update</button> · <button class="link" id="forget">Forget</button>';
   $('relocate').onclick=locate; $('forget').onclick=()=>{ try{ localStorage.removeItem('ovh:loc'); }catch(e){} loc=null; render(); }; }
 function locate(){ if(!navigator.geolocation){ $('where').textContent='Location is not available in this browser.'; return; }
   $('where').textContent='Finding you…';
@@ -122,8 +125,10 @@ function sunEcf(d){ const j=d.getTime()/864e5-10957.5, L=(280.46+0.9856474*j)%36
   return {x:Math.cos(dec)*Math.cos(lon),y:Math.cos(dec)*Math.sin(lon),z:Math.sin(dec)}; }
 function observer(){ const o={latitude:loc.lat*D2R,longitude:loc.lon*D2R,height:0}, e=satellite.geodeticToEcf(o), n=Math.hypot(e.x,e.y,e.z); return {geo:o,up:{x:e.x/n,y:e.y/n,z:e.z/n}}; }
 const sunAlt=(obs,d)=>{ const s=sunEcf(d); return Math.asin(obs.up.x*s.x+obs.up.y*s.y+obs.up.z*s.z)/D2R; };
-// "Tonight" runs from local noon to the next local noon, so after midnight it still means the night you're in.
-function nightWindow(base){ const n=new Date(base), s=new Date(n.getFullYear(),n.getMonth(),n.getDate(),12); if(n.getHours()<12) s.setDate(s.getDate()-1); return [s.getTime(),s.getTime()+864e5]; }
+// "Tonight" runs from local noon to the next local noon (local to the saved location, not the phone),
+// so after midnight it still means the night you're in.
+let LT=null; // time-zone helpers for the saved location, set in render()
+function nightWindow(base){ const s=LT.nightStart(base); return [s,LT.nextNoon(s)]; }
 function darkness(obs,start){ const ev={}; let prev=sunAlt(obs,new Date(start));
   for(let t=start+6e4;t<=start+864e5;t+=6e4){ const a=sunAlt(obs,new Date(t));
     if(prev>=-0.833&&a<-0.833&&!ev.sunset) ev.sunset=t; if(prev>=-12&&a<-12&&!ev.dark) ev.dark=t;
@@ -146,10 +151,8 @@ function passes(rec,obs,from,to,max){ const out=[]; let cur=null;
   if(cur&&out.length<max) out.push(cur); return out; }
 
 // ---------- formatting ----------
-const fmtTime=t=>new Date(t).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
-function whenLabel(t){ const d=new Date(t), n=new Date(), day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(), diff=Math.round((day(d)-day(n))/864e5), am=d.getHours()<12;
-  const name=diff===0?(am?'This morning':'Tonight'):diff===1?(am?'Tomorrow morning':'Tomorrow evening'):d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'});
-  return name+' '+fmtTime(t); }
+// every time and date is shown in the saved location's own time zone
+const fmtTime=t=>LT.time(t), whenLabel=t=>LT.when(t);
 const height=e=>e>=60?'almost overhead':e>=30?'high in the sky':'low in the sky';
 const mins=p=>Math.max(1,Math.round((p.end-p.start+30e3)/6e4));
 function chart(p){ const c=59,R=50, pt=([az,el])=>{ const r=R*(90-el)/90; return [(c+r*Math.sin(az)).toFixed(1),(c-r*Math.cos(az)).toFixed(1)]; };
@@ -184,14 +187,14 @@ const [stations,trains,kp]=await Promise.all([get('stations.tle','text'),get('tr
 const tle=(text,prefix)=>{ if(!text) return null; const L=text.split(/\r?\n/); for(let i=0;i<L.length-2;i++) if(L[i].startsWith(prefix)&&L[i+1].startsWith('1 ')) return satellite.twoline2satrec(L[i+1],L[i+2]); return null; };
 const STATIONS=[['the ISS',tle(stations,'ISS (ZARYA)')],['Tiangong',tle(stations,'CSS (TIANHE)')]].filter(x=>x[1]);
 
-function render(){ setWhere(); const out=[];
+function render(){ LT=loc?localTime(loc.lat,loc.lon):null; setWhere(); const out=[];
   if(!loc){ out.push('<section><h2>What you can see tonight</h2><p class="sub">Once you share your location: when the International Space Station and China’s Tiangong fly over, satellite trains, your chance of seeing the aurora, and when it gets dark.</p><button class="primary" id="locate2">Use my location</button></section>');
     $('content').innerHTML=out.join(''); $('locate2').onclick=locate; return; }
   const obs=observer(), now=Date.now(), [ws,we]=nightWindow(now), ev=darkness(obs,ws), m=moon(new Date(ev.dark||now));
 
   // darkness and Moon
   const f=(k,v)=>'<div><span>'+k+'</span><b>'+v+'</b></div>';
-  out.push('<section><h2>When it gets dark</h2><p class="sub">'+new Date(ws).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})+' into '+new Date(we).toLocaleDateString(undefined,{weekday:'long'})+'</p><div class="facts">'
+  out.push('<section><h2>When it gets dark</h2><p class="sub">'+LT.date(ws,{weekday:'long',day:'numeric',month:'long'})+' into '+LT.date(we,{weekday:'long'})+'</p><div class="facts">'
     +f('Sunset',ev.sunset?fmtTime(ev.sunset):'No sunset')+f('Properly dark from',ev.dark?fmtTime(ev.dark):'Never fully dark')+f('Dark until',ev.darkEnd?fmtTime(ev.darkEnd):'–')+f('Sunrise',ev.sunrise?fmtTime(ev.sunrise):'–')
     +f('Moon',esc(m.name))+f('Moon lit','about '+Math.round(m.lit*100)+'%')+'</div>'
     +'<p class="note">'+(m.lit>0.75?'A bright Moon tonight washes out faint stars and aurora; satellites are still easy to see.':m.lit<0.25?'Little moonlight tonight: good for faint stars and aurora.':'Some moonlight tonight.')+' “Properly dark” is when the Sun is 12° below the horizon.</p></section>');
@@ -222,9 +225,9 @@ function render(){ setWhere(); const out=[];
   if(!slots.length) au+='<p class="note">The aurora forecast isn’t available right now.</p>';
   else { const ml=magLat(loc.lat,loc.lon), need=Math.max(0,Math.min(9,(66.5-Math.abs(ml))/2.05)), side=loc.lat>=0?'northern':'southern';
     au+='<p class="sub">Based on NOAA’s 3-day Kp forecast. '+(need>=8.5?'You’re a long way from the aurora zone: it only reaches your '+side+' horizon in extreme storms (Kp 9).':'Where you are, aurora usually needs Kp '+need.toFixed(1)+' or more to show on the '+side+' horizon, seen from a dark spot away from city lights.')+'</p><div class="nights">';
-    for(let k=0;k<3;k++){ const s0=ws+k*864e5, e=k===0?ev:darkness(obs,s0), a=e.dark||s0+6*36e5, b=e.darkEnd||s0+18*36e5;
+    for(let k=0,s0=ws;k<3;k++,s0=LT.nextNoon(s0)){ const e=k===0?ev:darkness(obs,s0), a=e.dark||s0+6*36e5, b=e.darkEnd||s0+18*36e5;
       const inNight=slots.filter(x=>x.t+3*36e5>a&&x.t<b); const top=inNight.length?Math.max(...inNight.map(x=>x.kp)):null;
-      const label=k===0?'Tonight':new Date(s0).toLocaleDateString(undefined,{weekday:'long'});
+      const label=k===0?'Tonight':LT.date(s0,{weekday:'long'});
       if(top===null){ au+='<div class="night"><span>'+label+'</span><b>–</b><i class="low">No forecast yet</i></div>'; continue; }
       const [cls,txt]=auroraVerdict(top,need); au+='<div class="night"><span>'+label+'</span><b>Kp '+top.toFixed(1)+'</b><i class="'+cls+'">'+txt+'</i></div>'; }
     au+='</div><p class="note">Kp measures how disturbed Earth’s magnetic field is, from 0 (calm) to 9 (major storm). Forecasts more than a day out are rough; look '+(loc.lat>=0?'north':'south')+', away from streetlights, and phone cameras often pick up aurora your eyes miss.</p>'; }
