@@ -22,6 +22,10 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
       - name: Download from CelesTrak
         run: |
           set -euo pipefail
@@ -61,6 +65,7 @@ jobs:
           fetch ll-stations.json   "$LL/space_stations/?mode=detailed&limit=20"
           fetch ll-astronauts.json "$LL/astronauts/?in_space=true&mode=detailed&limit=100"
           fetch ll-expeditions.json "$LL/expeditions/?mode=detailed&ordering=-start&limit=12"
+          python3 scripts/build_crew.py out || echo "::warning::crew.json not built"
           true
 
       - name: Publish to the data branch

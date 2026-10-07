@@ -79,6 +79,15 @@ button.on{border-color:var(--accent)}
 .facts{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:14px}
 .facts span{color:var(--ink3);font-size:13px;padding-top:1px}
 .facts b{font-weight:500;overflow-wrap:anywhere}
+#crew{display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+#crew h3{margin:0;font-size:15px;font-weight:600}
+#crew .who{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px;background:var(--panel2)}
+#crew .nm{font-weight:600}
+#crew .role{color:var(--ink3);font-size:12px;font-weight:400;margin-left:6px}
+#crew .ctry{font-size:13px;color:var(--ink2)}
+#crew .ln{font-size:13px;margin-top:3px}
+#crew .ln span{color:var(--ink3)}
+#crew .est{color:var(--ink3);font-size:12px}
 .facts .st{display:inline-block;padding:1px 8px;border-radius:999px;font-size:13px;border:1px solid var(--line)}
 .facts .st.ok{border-color:var(--ok);color:var(--ok)}.facts .st.part{border-color:var(--warn);color:var(--warn)}.facts .st.bad{border-color:var(--bad);color:var(--bad)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -111,7 +120,7 @@ button.on{border-color:var(--accent)}
   </div>
   <div id="panel">
     <div class="row">
-      <input id="q" type="search" placeholder="Find by name, operator or purpose (ISS, NASA, weather...)" autocomplete="off">
+      <input id="q" type="search" placeholder="Find a satellite or astronaut (ISS, NASA, weather...)" autocomplete="off">
       <button id="locbtn">Use my location</button>
     </div>
     <div id="results"></div>
@@ -144,6 +153,7 @@ button.on{border-color:var(--accent)}
         <div><span>Visible across</span><b id="sfp">-</b></div>
       </div>
       <div class="facts" id="facts"></div>
+      <div id="crew"></div>
       <div class="row"><button id="clear">Stop following</button></div>
     </div>
     <div class="note">Satellite details come from the live <a href="https://celestrak.org/satcat/" target="_blank" rel="noopener">CelesTrak catalogue</a> and the <a href="https://www.ucs.org/resources/satellite-database" target="_blank" rel="noopener">UCS Satellite Database</a>. Positions are computed in your browser from orbital elements published by <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a> on <span id="epoch"></span>. The darker half of the globe is where it's night right now. The gold line is the followed satellite's path over the next 90 minutes, and the shaded circle is the area it can be seen from right now. Distances are to scale.</div>
@@ -178,7 +188,7 @@ const DATA='https://raw.githubusercontent.com/rr94-ai/satellites-/data/';
 async function orbits(group){
   try{ const r=await fetch(DATA+group+'.tle'); if(r.ok){ const t=await r.text(); if(t.includes('\n1 ')) return t; } }catch(e){}
   return cached('g:'+group,'https://celestrak.org/NORAD/elements/gp.php?GROUP='+group+'&FORMAT=tle',6,true); }
-let D;
+let D, CREW=null;
 try{
   const [tle,land,updated,...groups]=await Promise.all([
     orbits('active'),
@@ -188,6 +198,7 @@ try{
   ]);
   msg('Building the globe...');
   const gid=groups.map(t=>{ const s=new Set(); for(const l of t.split(/\r?\n/)) if(l.startsWith('1 ')) s.add(l.slice(2,7)); return s; });
+  fetch(DATA+'crew.json').then(r=>r.ok?r.json():null).then(c=>{ CREW=c; if(sel) renderCrew(sel); }).catch(()=>{});
   let META=null; try{ META=await cached('meta','meta.json',24,false); }catch(e){ META=null; }
   if(META&&META.strings) META.strings=META.strings.map(fixText);
   const lines=tle.split(/\r?\n/); const sats=[];
@@ -361,7 +372,27 @@ new ResizeObserver(resize).observe(wrap); window.addEventListener('resize',resiz
 // selection
 const label=document.getElementById('label'), followBtn=document.getElementById('follow');
 function select(s){ sel=s; document.getElementById('sel').style.display=s?'block':'none'; followBtn.style.display=s?'inline-block':'none'; selMarker.visible=!!s; trackLine.visible=false; label.textContent=s?s.name:'';
-  if(s){ document.getElementById('sname').textContent=s.name; document.getElementById('stag').textContent=s.groups.length?s.groups.map(i=>G[i]).join(', '):'Catalogue object'; document.getElementById('q').value=''; results.style.display='none'; renderFacts(s); tick(true); groundTrack(s,new Date()); } updateFootprints(); }
+  if(s){ document.getElementById('sname').textContent=s.name; document.getElementById('stag').textContent=s.groups.length?s.groups.map(i=>G[i]).join(', '):'Catalogue object'; document.getElementById('q').value=''; results.style.display='none'; renderFacts(s); tick(true); groundTrack(s,new Date()); } renderCrew(s); updateFootprints(); }
+// "On board now" for space stations, from crew.json (Launch Library 2, refreshed every 6 hours)
+const flag=c=>c&&/^[A-Z]{2}$/.test(c)?String.fromCodePoint(...[...c].map(ch=>127397+ch.charCodeAt(0)))+' ':'';
+const fmtDate=t=>new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+function stationFor(s){ return s&&CREW&&CREW.stations?CREW.stations.find(st=>s.name.startsWith(st.match)):null; }
+function renderCrew(s){ const box=document.getElementById('crew'); const st=stationFor(s);
+  if(!st||!st.crew.length){ box.style.display='none'; box.innerHTML=''; return; }
+  const now=Date.now(), n=st.crew.length;
+  const people=st.crew.map(c=>{
+    const ctry=c.countries.map(x=>flag(x.code)+esc(x.name)).join(', ')||'Nationality not listed';
+    const up=c.launched?new Date(c.launched):null, days=up?Math.max(0,Math.floor((now-up)/864e5)):null;
+    const arr=up?'<div class="ln"><span>Arrived:</span> launched '+fmtDate(c.launched)+(c.site?' from '+esc(c.site):'')+(c.mission?' on '+esc(c.mission):'')+(c.rocket?' ('+esc(c.rocket)+')':'')+' · '+days+' day'+(days===1?'':'s')+' in space</div>':'';
+    let dep='';
+    if(c.leaves){ const t=new Date(c.leaves), months=Math.round(c.typicalDays/30.4), ride=c.vehicle?' on '+esc(c.vehicle):'';
+      if(!c.leavesEstimated) dep=(t>now?'leaves '+fmtDate(c.leaves):'left '+fmtDate(c.leaves))+ride;
+      else if(t>now) dep='expected around '+t.toLocaleDateString(undefined,{month:'short',year:'numeric'})+ride+' <span class="est">(estimate: no date announced; stays usually last about '+(c.typicalDays<60?c.typicalDays+' days':months+' months')+')</span>';
+      else dep='expected soon'+ride+' <span class="est">(no date announced; already past the usual '+(c.typicalDays<60?c.typicalDays+'-day':months+'-month')+' stay)</span>'; }
+    return '<div class="who"><div class="nm">'+esc(c.name)+(c.role&&c.role!=='Crew'?'<span class="role">'+esc(c.role)+'</span>':'')+'</div>'
+      +'<div class="ctry">'+ctry+(c.agency?' · '+esc(c.agency):'')+'</div>'+arr+(dep?'<div class="ln"><span>Departure:</span> '+dep+'</div>':'')+'</div>'; }).join('');
+  box.innerHTML='<h3>On board now · '+n+' '+(n===1?'person':'people')+'</h3><div class="note">'+(st.expedition?esc(st.expedition)+' · ':'')+'crew data from <a href="https://thespacedevs.com/llapi" target="_blank" rel="noopener">The Space Devs</a>, updated '+fmtDate(CREW.updated)+'</div>'+people;
+  box.style.display='block'; }
 function esc(t){ return String(t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 const STATUS={'+':'Operational','-':'Not operational','P':'Partially operational','B':'Backup / standby','S':'Spare','X':'Extended mission','D':'Decayed','?':'Unknown','':'Not reported'};
 const TYPES={'PAY':'Payload','R/B':'Rocket body','DEB':'Debris','UNK':'Unknown'};
@@ -413,8 +444,10 @@ q.addEventListener('input',()=>{ const v=q.value.trim().toUpperCase(); results.i
   let hits=sats.filter(s=>s.name.toUpperCase().includes(v)); if(hits.length<30){ const more=sats.filter(s=>!hits.includes(s)&&((s.m.op||'')+' '+(s.m.owner||'')+' '+(s.m.purpose||'')+' '+(s.m.detail||'')).toUpperCase().includes(v)).slice(0,30-hits.length); hits=hits.concat(more); } hits=hits.slice(0,30);
   const alias={'ISS':'ISS (ZARYA)','HUBBLE':'HST','HUBBLE SPACE TELESCOPE':'HST','TIANGONG':'CSS (TIANHE)','CHINESE SPACE STATION':'CSS (TIANHE)','GPS':'NAVSTAR'};
   for(const k in alias){ if(k.startsWith(v)||v===k){ const z=sats.find(s=>s.name.startsWith(alias[k])); if(z&&!hits.includes(z)) hits.unshift(z); } }
+  const aboard=[]; if(CREW) for(const st of CREW.stations) for(const c of st.crew) if((c.name||'').toUpperCase().includes(v)){ const z=sats.find(x=>x.name.startsWith(st.match==='ISS ('?'ISS (ZARYA)':'CSS (TIANHE)')); if(z) aboard.push([z,c.name]); }
+  for(const [z,who] of aboard.reverse()){ hits=hits.filter(h=>h!==z); const d=document.createElement('div'); d.innerHTML=esc(z.name)+' <span style="color:var(--ink3)">'+esc(who)+' is on board</span>'; d.onclick=()=>select(z); results.appendChild(d); }
   hits.forEach(s=>{ const d=document.createElement('div'); d.innerHTML=esc(s.name)+(s.m.op||s.m.owner?' <span style="color:var(--ink3)">'+esc(s.m.op||s.m.owner)+(s.m.purpose?' - '+esc(s.m.purpose):'')+'</span>':''); d.onclick=()=>select(s); results.appendChild(d); });
-  if(!hits.length){ const d=document.createElement('div'); d.textContent='No satellite with that name in the catalogue'; results.appendChild(d); }
+  if(!hits.length&&!aboard.length){ const d=document.createElement('div'); d.textContent='No satellite with that name in the catalogue'; results.appendChild(d); }
   results.style.display='block'; });
 
 // location
