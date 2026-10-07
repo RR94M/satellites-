@@ -1,8 +1,12 @@
-"""Global weather layers for the globe: cloud cover and wind from NOAA's GFS model, tropical storms from GDACS.
+"""Global weather layers and alerts: cloud cover and wind from NOAA's GFS model, tropical storms and other disasters
+from GDACS, earthquakes from USGS, space weather alerts from NOAA SWPC.
 
 Writes into the directory given as argv[1]:
-  weather.json  1-degree grids of total cloud cover (%) and 10 m wind (m/s), packed as base64 bytes
-  storms.json   active tropical storms/hurricanes/typhoons worldwide: position, strength, past and forecast track
+  weather.json       1-degree grids of total cloud cover (%) and 10 m wind (m/s), packed as base64 bytes
+  storms.json        active tropical storms/hurricanes/typhoons worldwide: position, strength, past and forecast track
+  hazards.json       other current GDACS disasters (floods, wildfires, volcanoes, droughts) with alert levels
+  quakes.json        earthquakes of magnitude 4.5+ worldwide in the past week (USGS)
+  space-alerts.json  NOAA space weather alerts, watches and warnings from the past 3 days
 
 GFS is a US government product (public domain). GDACS is run by the European Commission's JRC with the UN.
 """
@@ -173,7 +177,7 @@ def storms(directory, events=None, geometry=None):
     events = events if events is not None else get("https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP")
     if not events:
         print("::warning::no GDACS event list")
-        return
+        return None
     out = []
     for feat in events.get("features", []):
         p = feat.get("properties", {})
@@ -189,7 +193,79 @@ def storms(directory, events=None, geometry=None):
     with open(f"{directory}/storms.json", "w") as f:
         json.dump({"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "source": "GDACS (European Commission JRC and UN)", "storms": out},
                   f, separators=(",", ":"))
+    hazards(directory, events)
     print(f"storms.json: {len(out)} storm(s): " + ", ".join(f"{s['name']} ({s['now']} now, peak {s['peak']} {s['peakKmh']} km/h, {len(s['past'])}+{len(s['forecast'])} pts)" for s in out))
+
+
+HAZARD = {"FL": "flood", "WF": "wildfire", "VO": "volcano", "DR": "drought", "EQ": "earthquake"}
+
+
+def hazards(directory, events):
+    """Current GDACS disasters other than storms (covered by storms.json) and earthquakes (USGS is quicker and fuller)."""
+    out = []
+    for feat in events.get("features", []):
+        p = feat.get("properties", {})
+        t = p.get("eventtype")
+        if t not in ("FL", "WF", "VO", "DR") or str(p.get("iscurrent")).lower() != "true":
+            continue
+        c = (feat.get("geometry") or {}).get("coordinates") or [None, None]
+        sev = (p.get("severitydata") or {}).get("severitytext") or ""
+        out.append({"type": HAZARD[t], "id": p.get("eventid"), "name": p.get("name") or p.get("description"), "alert": p.get("alertlevel"),
+                    "detail": sev.strip() if t != "FL" else "", "country": p.get("country"), "from": p.get("fromdate"), "to": p.get("todate"),
+                    "lon": c[0], "lat": c[1], "report": (p.get("url") or {}).get("report")})
+    rank = {"Red": 0, "Orange": 1, "Green": 2}
+    out.sort(key=lambda h: (rank.get(h["alert"], 3), h["to"] or ""), reverse=False)
+    with open(f"{directory}/hazards.json", "w") as f:
+        json.dump({"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "source": "GDACS", "hazards": out}, f, separators=(",", ":"))
+    print(f"hazards.json: {len(out)} event(s)")
+
+
+def quakes(directory):
+    d = get("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson")
+    if not d:
+        print("::warning::no USGS feed")
+        return
+    out = []
+    for f in d.get("features", []):
+        p, c = f.get("properties", {}), (f.get("geometry") or {}).get("coordinates") or [None, None, None]
+        out.append({"id": f.get("id"), "mag": p.get("mag"), "place": p.get("place"), "time": p.get("time"), "lon": c[0], "lat": c[1],
+                    "depth": c[2], "alert": p.get("alert"), "tsunami": p.get("tsunami"), "felt": p.get("felt"), "url": p.get("url")})
+    out.sort(key=lambda q: -(q["time"] or 0))
+    with open(f"{directory}/quakes.json", "w") as f:
+        json.dump({"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "source": "USGS", "quakes": out}, f, separators=(",", ":"))
+    print(f"quakes.json: {len(out)} earthquake(s), biggest M{max((q['mag'] or 0) for q in out) if out else 0}")
+
+
+def space_alerts(directory):
+    d = get("https://services.swpc.noaa.gov/products/alerts.json")
+    if d is None:
+        print("::warning::no SWPC alerts")
+        return
+    cutoff = datetime.now(timezone.utc) - timedelta(days=3)
+    out = []
+    for a in d:
+        try:
+            issued = datetime.strptime(a["issue_datetime"][:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        except (KeyError, ValueError):
+            continue
+        if issued < cutoff:
+            continue
+        lines = [l.strip() for l in (a.get("message") or "").replace("\r", "").split("\n")]
+        head = next((l for l in lines if l.split(":")[0] in ("ALERT", "WARNING", "WATCH", "SUMMARY", "EXTENDED WARNING", "CANCEL WARNING", "CANCEL WATCH")), None)
+        field = lambda name: next((l.split(":", 1)[1].strip() for l in lines if l.lower().startswith(name.lower() + ":")), None)
+        if not head:
+            continue
+        impacts = []
+        if "Potential Impacts:" in (a.get("message") or ""):
+            k = next(i for i, l in enumerate(lines) if l.startswith("Potential Impacts:"))
+            impacts = [l for l in [lines[k].split(":", 1)[1].strip()] + lines[k + 1:k + 6] if l and not l.startswith("www.")][:5]
+        out.append({"id": a.get("product_id"), "issued": issued.strftime("%Y-%m-%dT%H:%MZ"), "kind": head.split(":")[0].title(),
+                    "headline": head.split(":", 1)[1].strip(), "scale": field("NOAA Scale"), "validFrom": field("Valid From"),
+                    "validTo": field("Valid To"), "impacts": impacts})
+    out.sort(key=lambda x: x["issued"], reverse=True)
+    with open(f"{directory}/space-alerts.json", "w") as f:
+        json.dump({"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "source": "NOAA SWPC", "alerts": out}, f, separators=(",", ":"))
+    print(f"space-alerts.json: {len(out)} alert(s) in 3 days: " + "; ".join(x["headline"][:60] for x in out[:5]))
 
 
 if __name__ == "__main__":
@@ -199,7 +275,8 @@ if __name__ == "__main__":
         gfs(d)
     except Exception as e:  # noqa: BLE001
         print("::warning::GFS step failed:", e)
-    try:
-        storms(d)
-    except Exception as e:  # noqa: BLE001
-        print("::warning::storms step failed:", e)
+    for step in (storms, quakes, space_alerts):
+        try:
+            step(d)
+        except Exception as e:  # noqa: BLE001 - one source failing shouldn't stop the others
+            print(f"::warning::{step.__name__} step failed:", e)

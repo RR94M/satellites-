@@ -1,4 +1,5 @@
-# Global weather layers for the globe (cloud cover and wind from NOAA GFS, tropical storms from GDACS), copied to the
+# Global weather layers and alerts (cloud cover and wind from NOAA GFS, storms and disasters from GDACS, earthquakes
+# from USGS, space weather alerts from NOAA SWPC), copied to the
 # `weather` branch every hour. Kept apart from the other data branches so the jobs never overwrite each other.
 name: Update weather layers
 
@@ -32,7 +33,7 @@ jobs:
           python3 scripts/build_weather.py out
           prev="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/weather"
           # if a source was down, keep the previous copy rather than losing the layer
-          for f in weather.json storms.json; do
+          for f in weather.json storms.json hazards.json quakes.json space-alerts.json; do
             [ -f "out/$f" ] || curl -sSf -o "out/$f" "$prev/$f" && echo "$f ready" || echo "::warning::$f unavailable"
           done
           ls -la out
