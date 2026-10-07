@@ -69,6 +69,12 @@ section>h2{font-size:17px;font-weight:600;margin:0 0 2px}
 .al{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;border-top:1px solid var(--line);padding:11px 0}
 .al:first-of-type{border-top:0;padding-top:4px}
 .al .ic{font-size:22px;line-height:1.2;grid-row:span 4}
+/* earthquakes: a flashing red dot with a ring, like on the globe (the flash stays on with Reduce Motion; the ring only grows without it) */
+.qdot{position:relative;display:inline-block;width:12px;height:12px;margin:6px 5px 0;border-radius:50%;background:#FF3B30;box-shadow:0 0 8px 2px rgba(255,59,48,.6);animation:qflash 1.1s ease-in-out infinite}
+.qdot::after{content:'';position:absolute;inset:-2px;border-radius:50%;border:2px solid #FF3B30;animation:qring 1.6s ease-out infinite}
+@keyframes qflash{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes qring{from{transform:scale(1);opacity:.9}to{transform:scale(3);opacity:0}}
+@media (prefers-reduced-motion:reduce){.qdot::after{animation:none;transform:scale(1.8);opacity:.45}}
 .al b{font-weight:600;font-size:15px}
 .al .d{color:var(--ink2);font-size:14px}
 .al .m{color:var(--ink3);font-size:12px}
@@ -160,7 +166,7 @@ function forYou(){ if(!loc) return '<section><h2>For you</h2><p class="sub">Shar
       if(best&&best.d<800) out.push({t:best.t||now,lvl:0,html:item('🌀',esc(s.name)+' '+(best.t?'is forecast to pass within '+near(best.d).toLocaleString()+' km of you on '+fmt(best.t,{weekday:'long'}):'is '+near(best.d).toLocaleString()+' km from you'),esc(cap(s.now||''))+(s.peak?' now; forecast to peak as a '+esc(s.peak):'')+'. Follow your local weather service’s warnings.','',globe(s.at[1],s.at[0]))}); } }
   // earthquakes near you in the past 2 days
   if(D.quakes){ for(const q of D.quakes.quakes){ if(q.time<now-2*864e5||q.lat==null) continue; const d=km(L.lat,L.lon,q.lat,q.lon);
-      if(d<1000||(q.mag>=6.5&&d<2500)) out.push({t:q.time,lvl:q.mag>=6&&d<1000?0:d<300||q.mag>=6?1:2,html:item('🌍','Magnitude '+q.mag.toFixed(1)+' earthquake '+near(d).toLocaleString()+' km from you',esc(q.place)+(q.tsunami?'. A tsunami message was issued; check official sources.':'.'),ago(q.time),globe(q.lat,q.lon)+' · <a href="'+esc(q.url)+'" target="_blank" rel="noopener">USGS details</a>')}); } }
+      if(d<1000||(q.mag>=6.5&&d<2500)) out.push({t:q.time,lvl:q.mag>=6&&d<1000?0:d<300||q.mag>=6?1:2,html:item('<i class="qdot"></i>','Magnitude '+q.mag.toFixed(1)+' earthquake '+near(d).toLocaleString()+' km from you',esc(q.place)+(q.tsunami?'. A tsunami message was issued; check official sources.':'.'),ago(q.time),globe(q.lat,q.lon)+' · <a href="'+esc(q.url)+'" target="_blank" rel="noopener">USGS details</a>')}); } }
   // floods, fires and volcanoes nearby
   if(D.haz){ for(const h of D.haz.hazards){ if(h.lat==null) continue; const d=km(L.lat,L.lon,h.lat,h.lon); if(d<(h.type==='volcano'?500:300))
       out.push({t:Date.parse(h.to+'Z')||now,lvl:h.alert==='Red'?0:h.alert==='Orange'?1:2,html:item(ICON[h.type],esc(h.name)+', '+near(d).toLocaleString()+' km from you',esc(h.detail||''),'',globe(h.lat,h.lon))}); } }
@@ -178,7 +184,7 @@ function worldItems(){ const out=[]; const now=Date.now();
   if(D.storms) for(const s of D.storms.storms) if(s.at) out.push({type:'storm',rank:{Red:0,Orange:1,Green:2}[s.alert]??2,t:now,html:item('🌀',esc(s.name)+lvl(s.alert),esc(cap(s.now||''))+(s.peak&&s.peak!==s.now?', forecast to peak as a '+esc(s.peak)+' ('+s.peakKmh+' km/h)':'')+(s.countries&&s.countries.length?' · near '+esc(s.countries.slice(0,2).join(', ')):''),'Updated '+ago(Date.parse(s.updated+'Z')),globe(s.at[1],s.at[0])+(s.report?' · <a href="'+esc(s.report)+'" target="_blank" rel="noopener">GDACS report</a>':''))});
   if(D.quakes) for(const q of D.quakes.quakes){ if(q.lat==null) continue; const big=q.mag>=5.5||q.alert||q.tsunami; if(!big&&!(q.mag>=4.5&&q.time>now-864e5)) continue;
     const level=q.alert||(q.mag>=7?'red':q.mag>=6?'orange':null);
-    out.push({type:'earthquake',rank:level==='red'?0:level==='orange'||level==='yellow'?1:2,t:q.time,html:item('🌍','Magnitude '+q.mag.toFixed(1)+' · '+esc(q.place)+lvl(level),'Depth '+Math.round(q.depth)+' km'+(q.tsunami?' · tsunami message issued':'')+(q.felt?' · felt by '+q.felt.toLocaleString()+' people':''),ago(q.time),globe(q.lat,q.lon)+' · <a href="'+esc(q.url)+'" target="_blank" rel="noopener">USGS details</a>')}); }
+    out.push({type:'earthquake',rank:level==='red'?0:level==='orange'||level==='yellow'?1:2,t:q.time,html:item('<i class="qdot"></i>','Magnitude '+q.mag.toFixed(1)+' · '+esc(q.place)+lvl(level),'Depth '+Math.round(q.depth)+' km'+(q.tsunami?' · tsunami message issued':'')+(q.felt?' · felt by '+q.felt.toLocaleString()+' people':''),ago(q.time),globe(q.lat,q.lon)+' · <a href="'+esc(q.url)+'" target="_blank" rel="noopener">USGS details</a>')}); }
   if(D.vols) for(const v of D.vols.volcanoes){ if(v.lat==null) continue; const u=v.usgs, lv=u&&u.color?u.color.toLowerCase():null;
     out.push({type:'volcano',rank:lv==='red'?0:lv==='orange'?1:2,t:0,html:item('🌋',esc(v.name)+(v.country?' · '+esc(v.country):'')+(u?'<span class="lvl '+(lv==='red'?'red':lv==='orange'?'orange':'green')+'">USGS '+esc(u.color)+'</span>':''),
       (v.erupting?'Erupting'+sinceTxt(v.since):'Restless, not erupting')+(v.vei!=null?' · explosivity '+v.vei+' of 8':'')+(u?' · '+esc(u.level)+' from the '+esc(u.observatory||'USGS'):''),'',

@@ -166,7 +166,13 @@ button.primary{background:var(--accent);color:var(--onaccent);border-color:var(-
 .haztag .dr{display:block;width:10px;height:10px;border-radius:50%;background:#E0A030;box-shadow:0 0 8px #E0A030;animation:qflash 3s ease-in-out infinite}
 .haztag.small span{display:none}
 .haztag.small:hover span{display:block}
-@media (prefers-reduced-motion:reduce){.haztag .q,.haztag .q::after,.haztag .vo,.haztag .vo-wrap::before,.haztag .wf,.haztag .fl::before,.haztag .fl::after,.haztag .dr{animation:none}}
+/* Reduce Motion: keep the gentle flashing and glowing (no movement), but stop rings growing, puffs rising and flames swaying */
+@media (prefers-reduced-motion:reduce){
+  .haztag .q::after,.haztag .fl::before,.haztag .fl::after{animation:none;transform:scale(1.9);opacity:.45}
+  .haztag .fl{animation:qflash 1.6s ease-in-out infinite}
+  .haztag .vo-wrap::before{animation:none;opacity:0}
+  .haztag .wf{animation:qflash 1.4s ease-in-out infinite}
+}
 @keyframes spin{to{transform:rotate(-360deg)}}
 @media (prefers-reduced-motion:reduce){.stormtag i{animation:none}}
 #label{position:absolute;pointer-events:none;color:var(--accent);font-size:13px;font-weight:500;transform:translate(10px,-8px);white-space:nowrap;text-shadow:0 1px 3px var(--halo),0 0 2px var(--halo)}
