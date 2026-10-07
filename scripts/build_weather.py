@@ -7,6 +7,7 @@ Writes into the directory given as argv[1]:
   hazards.json       other current GDACS disasters (floods, wildfires, volcanoes, droughts) with alert levels
   quakes.json        earthquakes of magnitude 4.5+ worldwide in the past week (USGS)
   space-alerts.json  NOAA space weather alerts, watches and warnings from the past 3 days
+  volcanoes.json     volcanoes erupting now (Smithsonian GVP) and US volcanoes on alert (USGS)
 
 GFS is a US government product (public domain). GDACS is run by the European Commission's JRC with the UN.
 """
@@ -274,26 +275,60 @@ def space_alerts(directory):
     print(f"space-alerts.json: {len(out)} alert(s) in 3 days: " + "; ".join(x["headline"][:60] for x in out[:5]))
 
 
+GVP = "https://webservices.volcano.si.edu/geoserver/GVP-VOTW/ows?service=WFS&version=1.0.0&request=GetFeature&outputFormat=application/json&maxFeatures=5000&typeName=GVP-VOTW:"
+
+
+def nice_name(n):
+    """'Ruiz, Nevado del' -> 'Nevado del Ruiz'"""
+    if n and "," in n:
+        a, b = [x.strip() for x in n.split(",", 1)]
+        return f"{b} {a}"
+    return n
+
+
 def volcanoes(directory):
-    """Exploring sources for currently active volcanoes: save what each returns."""
-    browser = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
-               "Accept": "application/rss+xml, application/xml, application/json, */*"}
-    tries = {
-        "gvp-weekly.xml": "https://volcano.si.edu/news/WeeklyVolcanoRSS.xml",
-        "gvp-wfs-eruptions.json": "https://webservices.volcano.si.edu/geoserver/GVP-VOTW/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=GVP-VOTW:E3WebApp_Eruptions1960&outputFormat=application/json&maxFeatures=5000",
-        "gvp-wfs-caps.xml": "https://webservices.volcano.si.edu/geoserver/GVP-VOTW/ows?service=WFS&version=1.0.0&request=GetCapabilities",
-        "usgs-elevated.json": "https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes",
-        "usgs-cap.json": "https://volcanoes.usgs.gov/hans-public/api/volcano/getCapElevated",
-    }
-    for name, url in tries.items():
-        try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=browser), timeout=60) as r:
-                raw = r.read()
-            with open(f"{directory}/{name}", "wb") as f:
-                f.write(raw)
-            print(f"volcano source {name}: OK {len(raw)} bytes: {raw[:160]!r}")
-        except Exception as e:  # noqa: BLE001
-            print(f"volcano source {name}: failed: {e}")
+    """Volcanoes erupting now (Smithsonian Global Volcanism Program) plus US volcanoes on alert (USGS)."""
+    eruptions = get(GVP + "E3WebApp_Eruptions1960")
+    if not eruptions:
+        print("::warning::no GVP eruption list")
+        return
+    holocene = get(GVP + "Smithsonian_VOTW_Holocene_Volcanoes") or {}
+    info = {}  # volcano number -> country and coordinates, from the full volcano list
+    for f in holocene.get("features", []):
+        p = f.get("properties", {})
+        num = next((p[k] for k in p if k.lower().replace("_", "") in ("volcanonumber", "vnum")), None)
+        if num is None: continue
+        c = (f.get("geometry") or {}).get("coordinates") or [None, None]
+        info[str(num)] = {"country": next((p[k] for k in p if k.lower() == "country"), None), "lon": c[0], "lat": c[1],
+                          "type": next((p[k] for k in p if k.lower().replace("_", "") == "primaryvolcanotype"), None)}
+    out = {}
+    for f in eruptions.get("features", []):
+        p = f.get("properties", {})
+        if str(p.get("ContinuingEruption")).lower() != "true": continue
+        num = str(p.get("VolcanoNumber"))
+        since = p.get("StartDate") or ""
+        v = out.get(num)
+        if v and v["since"] <= since: continue  # keep the earliest start of a continuing eruption
+        extra = info.get(num, {})
+        out[num] = {"number": num, "name": nice_name(p.get("VolcanoName")), "lat": p.get("LatitudeDecimal"), "lon": p.get("LongitudeDecimal"),
+                    "since": since, "vei": p.get("ExplosivityIndexMax"), "erupting": True, "country": extra.get("country"),
+                    "kind": extra.get("type"), "url": f"https://volcano.si.edu/volcano.cfm?vn={num}"}
+    usgs = get("https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes") or []
+    for u in usgs:
+        num = str(u.get("vnum"))
+        v = out.get(num)
+        if not v:
+            extra = info.get(num)
+            if not extra or extra.get("lat") is None: continue
+            v = out[num] = {"number": num, "name": u.get("volcano_name"), "lat": extra["lat"], "lon": extra["lon"], "since": None, "vei": None,
+                            "erupting": False, "country": extra.get("country"), "kind": extra.get("type"), "url": f"https://volcano.si.edu/volcano.cfm?vn={num}"}
+        v["usgs"] = {"color": (u.get("color_code") or "").title(), "level": (u.get("alert_level") or "").title(), "url": u.get("notice_url"),
+                     "observatory": u.get("obs_fullname")}
+    vols = sorted(out.values(), key=lambda v: (not v["erupting"], v["name"] or ""))
+    with open(f"{directory}/volcanoes.json", "w") as f:
+        json.dump({"updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "source": "Smithsonian Global Volcanism Program; USGS",
+                   "volcanoes": vols}, f, separators=(",", ":"), ensure_ascii=False)
+    print(f"volcanoes.json: {sum(v['erupting'] for v in vols)} erupting, {len(vols)} in all (country known for {sum(1 for v in vols if v['country'])})")
 
 
 if __name__ == "__main__":

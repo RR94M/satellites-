@@ -33,7 +33,7 @@ jobs:
           python3 scripts/build_weather.py out
           prev="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/weather"
           # if a source was down, keep the previous copy rather than losing the layer
-          for f in weather.json storms.json hazards.json quakes.json space-alerts.json; do
+          for f in weather.json storms.json hazards.json quakes.json space-alerts.json volcanoes.json; do
             [ -f "out/$f" ] || curl -sSf -o "out/$f" "$prev/$f" && echo "$f ready" || echo "::warning::$f unavailable"
           done
           ls -la out
