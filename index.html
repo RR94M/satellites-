@@ -217,7 +217,7 @@ async function cached(key,url,ttlHours,asText){ try{ const c=JSON.parse(localSto
 // Orbital elements come from this repo's `data` branch, which a GitHub Action refreshes from CelesTrak every
 // 6 hours. Visitors never hit CelesTrak directly for these, so its per-address download limit (HTTP 403)
 // can't block them. CelesTrak itself is only a fallback if the copy is unreachable.
-const DATA='https://raw.githubusercontent.com/rr94-ai/satellites-/data/';
+const DATA='https://raw.githubusercontent.com/RR94M/satellites-/data/';
 async function orbits(group){
   try{ const r=await fetch(DATA+group+'.tle'); if(r.ok){ const t=await r.text(); if(t.includes('\n1 ')) return t; } }catch(e){}
   return cached('g:'+group,'https://celestrak.org/NORAD/elements/gp.php?GROUP='+group+'&FORMAT=tle',6,true); }
@@ -324,7 +324,7 @@ const night=new THREE.Mesh(new THREE.SphereGeometry(R*1.0015,96,64),new THREE.Sh
 night.renderOrder=1; scene.add(night);
 // aurora: NOAA's nowcast of where it's overhead (green, brighter = more likely), and the furthest-from-the-pole
 // line it can be seen from, low on the horizon, at the current Kp (dashed). See lib/aurora.js for the Kp maths.
-const NOAA='https://services.swpc.noaa.gov/json/', AUR_COPY='https://raw.githubusercontent.com/rr94-ai/satellites-/aurora/aurora.json';
+const NOAA='https://services.swpc.noaa.gov/json/', AUR_COPY='https://raw.githubusercontent.com/RR94M/satellites-/aurora/aurora.json';
 const aurCanvas=document.createElement('canvas'); aurCanvas.width=360; aurCanvas.height=180;
 const aurTex=new THREE.CanvasTexture(aurCanvas);
 const aurora=new THREE.Mesh(new THREE.SphereGeometry(R*1.003,96,64),new THREE.MeshBasicMaterial({map:aurTex,transparent:true,depthWrite:false}));
