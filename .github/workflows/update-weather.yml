@@ -1,0 +1,50 @@
+# Global weather layers for the globe (cloud cover and wind from NOAA GFS, tropical storms from GDACS), copied to the
+# `weather` branch every hour. Kept apart from the other data branches so the jobs never overwrite each other.
+name: Update weather layers
+
+on:
+  schedule:
+    - cron: '47 * * * *'
+  workflow_dispatch:
+  push:            # also run straight away when this workflow or its script changes
+    branches: [main]
+    paths: ['.github/workflows/update-weather.yml', 'scripts/build_weather.py']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-weather
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      - name: Build weather layers
+        run: |
+          set -uo pipefail
+          pip install -q pygrib numpy
+          python3 scripts/build_weather.py out
+          prev="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/weather"
+          # if a source was down, keep the previous copy rather than losing the layer
+          for f in weather.json storms.json; do
+            [ -f "out/$f" ] || curl -sSf -o "out/$f" "$prev/$f" && echo "$f ready" || echo "::warning::$f unavailable"
+          done
+          ls -la out
+          date -u +%Y-%m-%dT%H:%MZ > out/updated.txt
+
+      - name: Publish to the weather branch
+        run: |
+          set -euo pipefail
+          cd out
+          git init -q -b weather
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Weather layers $(cat updated.txt)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" weather
