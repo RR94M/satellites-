@@ -88,6 +88,19 @@ svg.chart .start{fill:var(--accent)}
 .night b{display:block;font-size:15px;font-weight:600}
 .night i{font-style:normal;font-size:13px}
 .good{color:var(--good)} .maybe{color:var(--maybe)} .low{color:var(--low)}
+/* cloud: a word plus a colour, never colour alone */
+.cl{font-size:13px;margin-top:2px}
+.clouds{margin-top:12px}
+.clouds h3{font-size:14px;font-weight:600;margin:0}
+svg.cloudbars{width:100%;max-width:520px;height:auto;display:block;margin-top:6px}
+svg.cloudbars .bar{fill:var(--skyline)}
+svg.cloudbars .bar:hover,svg.cloudbars .bar.on{fill:var(--ink2)}
+svg.cloudbars .hit{fill:transparent;cursor:pointer}
+svg.cloudbars .base{stroke:var(--line);stroke-width:1}
+svg.cloudbars .mid{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
+svg.cloudbars text{fill:var(--ink3);font-size:11px;font-family:inherit}
+svg.cloudbars .pmark{fill:var(--accent)}
+.cloudcap{font-size:13px;color:var(--ink2);min-height:1.4em;margin-top:2px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg button{border:0;border-radius:0;padding:5px 10px;font-size:13px}
 .seg button+button{border-left:1px solid var(--line)}
@@ -109,7 +122,7 @@ nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
   </header>
   <div id="content"><section><p class="loading">Loading the latest orbits…</p></section></div>
 </main>
-<footer>Orbits from <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>, aurora forecast from <a href="https://www.swpc.noaa.gov" target="_blank" rel="noopener">NOAA Space Weather Prediction Center</a>, refreshed every 6 hours. Sightings are worked out on your device; your location never leaves it. If you type a town instead, just that name is looked up with <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>.</footer>
+<footer>Orbits from <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>, aurora forecast from <a href="https://www.swpc.noaa.gov" target="_blank" rel="noopener">NOAA Space Weather Prediction Center</a>, refreshed every 6 hours. Sightings are worked out on your device. The cloud forecast comes from <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>: to get it, your position rounded to about 10 km is sent to them (and if you type a town, that name is looked up there too). Nothing else about you leaves your device.</footer>
 <script>
 (async function(){
 const DATA='https://raw.githubusercontent.com/RR94M/satellites-/data/';
@@ -185,9 +198,44 @@ function chart(p){ const c=59,R=50, pt=([az,el])=>{ const r=R*(90-el)/90; return
     +(pts.length>1?'<polyline class="path" points="'+pts.map(q=>q.join(',')).join(' ')+'"/>':'')+'<circle class="start" cx="'+s[0]+'" cy="'+s[1]+'" r="3.5"/></svg>'; }
 // "Add to calendar" menu: lib/calendar.js (shared with the Launches page)
 const calendarLink=(title,p,detail)=>CALENDAR.menu({title:title+' (look '+compass(p.startAz)+')',start:p.start-60e3,end:p.end+60e3,detail,alarmMinutes:10});
+// ---------- cloud forecast from Open-Meteo: cloud is the commonest reason to miss a sighting ----------
+// Only your rounded position (about 10 km) is sent, and only to fetch this forecast.
+let CLOUD=null, cloudKey='';
+async function loadCloud(){ if(!loc) return; const la=loc.lat.toFixed(1), lo=loc.lon.toFixed(1), key=la+','+lo;
+  if(cloudKey===key&&CLOUD&&Date.now()-CLOUD.at<36e5) return; cloudKey=key;
+  try{ const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude='+la+'&longitude='+lo+'&hourly=cloud_cover&forecast_days=4&timeformat=unixtime'); if(!r.ok) throw new Error(r.status);
+    const d=await r.json(), t=d.hourly.time, c=d.hourly.cloud_cover; CLOUD={at:Date.now(),key,hours:t.map((x,i)=>[x*1e3,c[i]]).filter(h=>h[1]!=null)}; }
+  catch(e){ CLOUD={at:Date.now(),key,hours:[],failed:true}; }
+  if(loc&&!CALENDAR.isOpen()) render(); }
+function cloudAt(t){ if(!CLOUD||!CLOUD.hours.length) return null; let best=null; for(const [ht,c] of CLOUD.hours){ const d=Math.abs(ht-t); if(d<=45*6e4&&(!best||d<best[0])) best=[d,c]; } return best?best[1]:null; }
+function cloudAvg(a,b){ const xs=CLOUD?CLOUD.hours.filter(h=>h[0]>=a&&h[0]<=b).map(h=>h[1]):[]; return xs.length?xs.reduce((x,y)=>x+y,0)/xs.length:null; }
+const cloudWord=c=>c<25?['good','Likely clear']:c<60?['maybe','Some cloud']:c<85?['low','Mostly cloudy']:['low','Cloudy: probably hidden'];
+const cloudLine=c=>{ if(c==null) return ''; const [k,w]=cloudWord(c); return '<div class="cl '+k+'">'+w+' · '+Math.round(c)+'% cloud forecast</div>'; };
+// tonight's cloud, hour by hour: one series, so no legend; the title names it; tap or hover a bar for its value
+function cloudStrip(a,b,passTimes){ if(!CLOUD) return '<div class="clouds"><p class="note">Loading the cloud forecast…</p></div>';
+  const hrs=CLOUD.hours.filter(h=>h[0]>=a-30*6e4&&h[0]<=b+30*6e4); if(!hrs.length) return CLOUD.failed?'<div class="clouds"><p class="note">The cloud forecast isn’t available right now.</p></div>':'';
+  const W=340,H=104,top=8,base=74,n=hrs.length,step=W/n,bw=Math.max(4,step-2),y=c=>base-(base-top)*c/100;
+  let o='<svg class="cloudbars" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Cloud cover tonight, hour by hour: '+hrs.map(h=>fmtTime(h[0])+' '+Math.round(h[1])+'%').join(', ')+'">'
+    +'<line class="mid" x1="0" x2="'+W+'" y1="'+y(50)+'" y2="'+y(50)+'"/><text x="'+(W-2)+'" y="'+(y(50)-4)+'" text-anchor="end">50%</text>';
+  hrs.forEach(([t,c],i)=>{ const x=i*step+1, h=Math.max(2,base-y(c)), r=Math.min(4,h/2,bw/2);
+    // bar with rounded top corners, anchored to the baseline
+    o+='<path class="bar" data-i="'+i+'" d="M'+x+','+base+' V'+(base-h+r)+' Q'+x+','+(base-h)+' '+(x+r)+','+(base-h)+' H'+(x+bw-r)+' Q'+(x+bw)+','+(base-h)+' '+(x+bw)+','+(base-h+r)+' V'+base+'Z"/>'
+      +'<rect class="hit" data-i="'+i+'" x="'+(i*step)+'" y="0" width="'+step+'" height="'+H+'"><title>'+fmtTime(t)+': '+Math.round(c)+'% cloud</title></rect>';
+    if(i%Math.ceil(n/4)===0) o+='<text x="'+(x+bw/2)+'" y="'+(base+16)+'" text-anchor="middle">'+fmtTime(t)+'</text>'; });
+  o+='<line class="base" x1="0" x2="'+W+'" y1="'+base+'" y2="'+base+'"/>';
+  for(const pt of passTimes){ const i=(pt-hrs[0][0])/36e5; if(i<-.5||i>n-.5) continue; const x=(i+.5)*step; o+='<path class="pmark" d="M'+x.toFixed(1)+','+(base+20)+' l-5,8 h10z"><title>Sighting at '+fmtTime(pt)+'</title></path>'; }
+  o+='</svg>';
+  const best=hrs.reduce((m,h)=>h[1]<m[1]?h:m), worst=hrs.reduce((m,h)=>h[1]>m[1]?h:m), avg=hrs.reduce((x,h)=>x+h[1],0)/n;
+  const sum=worst[1]<25?'Clear skies all night.':best[1]>=85?'Cloudy all night, so you probably won’t see much.':avg<40?'Mostly clear; clearest around '+fmtTime(best[0])+' ('+Math.round(best[1])+'%).':'Clearest around '+fmtTime(best[0])+' ('+Math.round(best[1])+'% cloud).';
+  window.__cloudHrs=hrs;
+  return '<div class="clouds"><h3>Cloud tonight</h3><p class="note" style="margin:2px 0 0">'+sum+(passTimes.length?' Triangles mark sightings.':'')+'</p>'+o+'<div class="cloudcap" id="cloudCap" aria-live="polite"></div></div>'; }
+document.addEventListener('pointerover',e=>{ const b=e.target.closest&&e.target.closest('svg.cloudbars [data-i]'); if(!b||!window.__cloudHrs) return; const h=window.__cloudHrs[+b.dataset.i], cap=document.getElementById('cloudCap'); if(!h||!cap) return;
+  document.querySelectorAll('svg.cloudbars .bar.on').forEach(x=>x.classList.remove('on')); const bar=document.querySelector('svg.cloudbars .bar[data-i="'+b.dataset.i+'"]'); if(bar) bar.classList.add('on');
+  cap.textContent=fmtTime(h[0])+': '+Math.round(h[1])+'% cloud ('+cloudWord(h[1])[1].toLowerCase()+')'; });
+
 function passRow(what,p,extra){ const now=p.start<=Date.now();
   const dir='Appears in the '+compass(p.startAz)+', rises to '+Math.round(p.maxEl)+'° ('+height(p.maxEl)+'), disappears in the '+compass(p.endAz);
-  return '<div class="pass'+(now?' now':'')+'"><div><div class="what">'+esc(what)+'</div><div class="when">'+(now?'Visible right now':whenLabel(p.start))+' · '+mins(p)+' min</div>'
+  return '<div class="pass'+(now?' now':'')+'"><div><div class="what">'+esc(what)+'</div><div class="when">'+(now?'Visible right now':whenLabel(p.start))+' · '+mins(p)+' min</div>'+cloudLine(cloudAt(p.start))
     +'<div class="dir">'+dir+(extra?'. '+extra:'')+'</div><div class="acts">'+calendarLink('See '+what,p,dir+'. Look for a steady bright light moving faster than a plane.')+'</div></div>'+chart(p)+'</div>'; }
 
 // ---------- aurora ----------
@@ -200,7 +248,7 @@ const [stations,trains,kp]=await Promise.all([get('stations.tle','text'),get('tr
 const tle=(text,prefix)=>{ if(!text) return null; const L=text.split(/\r?\n/); for(let i=0;i<L.length-2;i++) if(L[i].startsWith(prefix)&&L[i+1].startsWith('1 ')) return satellite.twoline2satrec(L[i+1],L[i+2]); return null; };
 const STATIONS=[['the ISS',tle(stations,'ISS (ZARYA)')],['Tiangong',tle(stations,'CSS (TIANHE)')]].filter(x=>x[1]);
 
-function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; setWhere(); const out=[];
+function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; setWhere(); const out=[]; if(loc) loadCloud();
   if(!loc){ out.push('<section><h2>What you can see tonight</h2><p class="sub">Once you share your location: when the International Space Station and China’s Tiangong fly over, satellite trains, your chance of seeing the aurora, and when it gets dark.</p><button class="primary" id="locate2">Use my location</button></section>');
     $('content').innerHTML=out.join(''); $('locate2').onclick=locate; return; }
   const obs=observer(), now=Date.now(), [ws,we]=nightWindow(now), ev=darkness(obs,ws), m=moon(new Date(ev.dark||now));
@@ -210,6 +258,7 @@ function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; set
   out.push('<section><h2>When it gets dark</h2><p class="sub">'+LT.date(ws,{weekday:'long',day:'numeric',month:'long'})+' into '+LT.date(we,{weekday:'long'})+'</p><div class="facts">'
     +f('Sunset',ev.sunset?fmtTime(ev.sunset):'No sunset')+f('Properly dark from',ev.dark?fmtTime(ev.dark):'Never fully dark')+f('Dark until',ev.darkEnd?fmtTime(ev.darkEnd):'–')+f('Sunrise',ev.sunrise?fmtTime(ev.sunrise):'–')
     +f('Moon',esc(m.name))+f('Moon lit','about '+Math.round(m.lit*100)+'%')+'</div>'
+    +cloudStrip(ev.sunset||ws+6*36e5,ev.sunrise||ws+18*36e5,STATIONS.flatMap(([,rec])=>passes(rec,obs,Math.max(now-5*6e4,ev.sunset||ws),ev.sunrise||we,6).map(p=>p.start)))
     +'<p class="note">'+(m.lit>0.75?'A bright Moon tonight washes out faint stars and aurora; satellites are still easy to see.':m.lit<0.25?'Little moonlight tonight: good for faint stars and aurora.':'Some moonlight tonight.')+' “Properly dark” is when the Sun is 12° below the horizon.</p></section>');
 
   // space stations
@@ -242,7 +291,8 @@ function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; set
       const inNight=slots.filter(x=>x.t+3*36e5>a&&x.t<b); const top=inNight.length?Math.max(...inNight.map(x=>x.kp)):null;
       const label=k===0?'Tonight':LT.date(s0,{weekday:'long'});
       if(top===null){ au+='<div class="night"><span>'+label+'</span><b>–</b><i class="low">No forecast yet</i></div>'; continue; }
-      const [cls,txt]=auroraVerdict(top,need); au+='<div class="night"><span>'+label+'</span><b>Kp '+top.toFixed(1)+'</b><i class="'+cls+'">'+txt+'</i></div>'; }
+      const [cls,txt]=auroraVerdict(top,need), cc=cloudAvg(a,b);
+      au+='<div class="night"><span>'+label+'</span><b>Kp '+top.toFixed(1)+'</b><i class="'+cls+'">'+txt+'</i>'+(cc!=null?'<i class="cl '+cloudWord(cc)[0]+'" style="display:block">'+cloudWord(cc)[1]+' ('+Math.round(cc)+'% cloud)</i>':'')+'</div>'; }
     au+='</div><p class="note">Kp measures how disturbed Earth’s magnetic field is, from 0 (calm) to 9 (major storm). Forecasts more than a day out are rough; look '+(loc.lat>=0?'north':'south')+', away from streetlights, and phone cameras often pick up aurora your eyes miss.</p>'; }
   out.push(au+'</section>');
   $('content').innerHTML=out.join(''); }
