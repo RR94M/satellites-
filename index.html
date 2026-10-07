@@ -57,6 +57,21 @@ canvas{display:block;touch-action:none}
 .clock span{display:block;color:var(--hud);font-size:17px;font-weight:500}
 .hint{position:absolute;left:14px;bottom:12px;font-size:12px;color:var(--hud3);pointer-events:none;text-shadow:0 1px 3px var(--halo)}
 .viewbtns{position:absolute;right:14px;bottom:12px;display:flex;gap:6px}
+/* compass: which way you're facing, from the phone's compass */
+#cmpBtn{position:absolute;right:14px;top:58px;width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center;background:var(--hudbtn);color:var(--hud);border-color:var(--line)}
+#cmpBtn svg{width:22px;height:22px}
+#cmp{position:absolute;right:14px;top:58px;width:184px;padding:12px;border-radius:14px;background:var(--hudbtn);border:1px solid var(--line);color:var(--hud);text-align:center;display:none;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#cmp.on{display:block}
+#cmp .x{position:absolute;right:6px;top:4px;background:none;border:0;color:var(--hud2);font-size:18px;padding:2px 6px}
+#cmp svg{width:132px;height:132px;display:block;margin:2px auto 6px}
+#cmp .dial{transition:transform .15s linear}
+#cmp .ring{fill:none;stroke:var(--line);stroke-width:2}
+#cmp .tick{stroke:var(--hud2);stroke-width:1.5}
+#cmp text{fill:var(--hud);font-family:inherit;font-size:13px;font-weight:600;text-anchor:middle;dominant-baseline:central}
+#cmp text.n{fill:var(--accent)}
+#cmp .me{fill:var(--accent)}
+#cmp b{display:block;font-size:17px;font-weight:600}
+#cmp span{display:block;font-size:12px;color:var(--hud2);margin-top:2px}
 .viewbtns button{background:var(--hudbtn);color:var(--hud);border-color:var(--line)}
 #label{position:absolute;pointer-events:none;color:var(--accent);font-size:13px;font-weight:500;transform:translate(10px,-8px);white-space:nowrap;text-shadow:0 1px 3px var(--halo),0 0 2px var(--halo)}
 #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--veil);color:var(--hud);text-align:center;padding:24px;font-size:15px}
@@ -145,6 +160,8 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     <div id="label"></div>
     <div id="loading"><div><b>Loading the satellite catalogue</b><span id="loadmsg">Fetching orbital elements from CelesTrak...</span></div></div>
     <div class="hint">Drag to spin. Scroll or pinch to zoom. Tap a dot to follow it.</div>
+    <button id="cmpBtn" aria-label="Compass: which way am I facing?" title="Compass"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4.5 L15 12 H9Z" fill="var(--accent)"/><path d="M12 19.5 L9 12 H15Z" fill="currentColor" opacity=".6"/></svg></button>
+    <div id="cmp" role="dialog" aria-label="Compass"><button class="x" id="cmpClose" aria-label="Close compass">×</button><svg viewBox="-70 -70 140 140" aria-hidden="true"><g class="dial" id="cmpDial"><circle class="ring" r="60"/><g id="cmpTicks"></g><text class="n" y="-46">N</text><text x="46">E</text><text y="46">S</text><text x="-46">W</text></g><path class="me" d="M0,-66 L7,-52 H-7Z"/><circle r="3" class="me"/></svg><b id="cmpDir">Starting…</b><span id="cmpNote">Hold your phone flat, top pointing the way you’re facing.</span></div>
     <div class="viewbtns"><button id="reset">Reset view</button><button id="follow" style="display:none">Fly to it</button></div>
   </div>
   <div id="panel">
@@ -503,6 +520,30 @@ function updateSel(){ if(!sel||!sel.ok) return; const f=(n,d)=>n.toFixed(d);
   const fa=footAngle(Math.hypot(sel.x,sel.y,sel.z)); document.getElementById('sfp').textContent=Math.round(2*fa*6371).toLocaleString()+' km wide';
   document.getElementById('sel-el').textContent=me?(sel.el>0?Math.round(sel.el)+'° above horizon':'below horizon'):'-'; }
 document.getElementById('clear').onclick=()=>select(null);
+// ---------- compass: which way you're facing, from the phone's own compass sensor ----------
+(function(){ const btn=document.getElementById('cmpBtn'), box=document.getElementById('cmp'), dial=document.getElementById('cmpDial'), dirEl=document.getElementById('cmpDir'), note=document.getElementById('cmpNote');
+  let t=''; for(let a=0;a<360;a+=30) if(a%90) t+='<line class="tick" x1="0" y1="-60" x2="0" y2="-53" transform="rotate('+a+')"/>'; document.getElementById('cmpTicks').innerHTML=t;
+  const NAMES=['north','north-east','east','south-east','south','south-west','west','north-west'];
+  let on=false, shown=null, last=0, timer=null, kind=null;
+  function show(h){ // smooth, taking the short way round 359 -> 0
+    if(shown===null) shown=h; else { let d=((h-shown+540)%360)-180; shown=(shown+d*.35+360)%360; }
+    dial.style.transform='rotate('+(-shown).toFixed(1)+'deg)';
+    const name=NAMES[Math.round(shown/45)%8]; dirEl.textContent='Facing '+name; note.textContent=Math.round(shown)+'° from north. Hold your phone flat, top pointing ahead.'; }
+  function onOrient(e){ let h=null;
+    if(typeof e.webkitCompassHeading==='number'&&!isNaN(e.webkitCompassHeading)) h=e.webkitCompassHeading;       // iPhone: degrees from north
+    else if((e.absolute||e.type==='deviceorientationabsolute')&&e.alpha!=null) h=360-e.alpha;                    // Android: alpha counts the other way
+    if(h==null) return; const turn=(screen.orientation&&typeof screen.orientation.angle==='number')?screen.orientation.angle:(window.orientation||0);
+    last=Date.now(); const now=performance.now(); if(now-(onOrient.t||0)<60) return; onOrient.t=now; show((h+turn+360)%360); }
+  function stop(){ on=false; box.classList.remove('on'); btn.style.display=''; if(kind) window.removeEventListener(kind,onOrient); kind=null; clearTimeout(timer); }
+  async function start(){ on=true; shown=null; last=0; box.classList.add('on'); btn.style.display='none'; dirEl.textContent='Finding north…'; note.textContent='Hold your phone flat, top pointing the way you’re facing.';
+    const DOE=window.DeviceOrientationEvent;
+    if(!DOE){ dirEl.textContent='No compass'; note.textContent='This browser can’t read a compass. Try on your phone.'; return; }
+    if(typeof DOE.requestPermission==='function'){ // iPhone asks first
+      try{ if(await DOE.requestPermission()!=='granted'){ dirEl.textContent='Compass not allowed'; note.textContent='Allow “Motion & Orientation” when asked. If you said no, close and reopen Safari, then try again.'; return; } }
+      catch(e){ dirEl.textContent='Compass not allowed'; note.textContent='Allow “Motion & Orientation” access for this site, then try again.'; return; } }
+    kind='ondeviceorientationabsolute' in window?'deviceorientationabsolute':'deviceorientation'; window.addEventListener(kind,onOrient);
+    timer=setTimeout(()=>{ if(on&&!last){ dirEl.textContent='No compass found'; note.textContent='This device doesn’t have a compass (most laptops don’t). Try on your phone.'; } },3000); }
+  btn.onclick=start; document.getElementById('cmpClose').onclick=stop; })();
 document.getElementById('reset').onclick=()=>{ flyTo(new THREE.Vector3(0,8,22)); };
 followBtn.onclick=()=>{ if(!sel||!sel.ok) return; const p=new THREE.Vector3(sel.x,sel.y,sel.z); const d=Math.max(p.length()*1.4,R*2.6); flyTo(p.clone().normalize().multiplyScalar(d)); };
 let fly=null; function flyTo(target){ fly={from:camera.position.clone(),to:target,t:0}; }
