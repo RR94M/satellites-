@@ -1,7 +1,8 @@
 """Slim Launch Library 2 downloads into launches.json for the Launches page.
 
 Inputs, in the directory given as argv[1]: ll-upcoming.json and ll-previous.json (raw API responses, ~1.7 MB).
-Output: launches.json with just what the page shows (~10% of the size).
+Output: launches.json with just what the page shows (~10% of the size). Photos are left out on purpose:
+many are licensed for non-commercial use only, so the page draws its own graphics instead.
 """
 import json
 import re
@@ -48,7 +49,6 @@ def person(entry):
         "role": g(entry, "role", "role"),
         "agency": g(a, "agency", "abbrev") or g(a, "agency", "name"),
         "countries": [country(n) for n in a.get("nationality") or []],
-        "image": g(a, "image", "thumbnail_url"),
     }
 
 
@@ -104,8 +104,6 @@ def slim(l):
             "map": g(l, "pad", "map_url"),
             "tz": g(l, "pad", "location", "timezone_name"),
         },
-        "image": g(l, "image", "thumbnail_url"),
-        "imageCredit": " · ".join(x for x in (g(l, "image", "credit"), g(l, "image", "license", "name")) if x and x != "Unknown") or None,
         "webcastLive": bool(l.get("webcast_live")),
         "videos": [{"title": v.get("title"), "url": v.get("url"), "publisher": v.get("publisher"), "type": g(v, "type", "name"),
                     "live": bool(v.get("live")), "start": v.get("start_time")} for v in vids[:4] if v.get("url")],
