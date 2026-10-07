@@ -282,7 +282,7 @@ function render(){ CALENDAR.reset(); LT=loc?localTime(loc.lat,loc.lon):null; set
       if(top===null){ au+='<div class="night"><span>'+label+'</span><b>–</b><i class="low">No forecast yet</i></div>'; continue; }
       const [cls,txt]=auroraVerdict(top,need), cc=cloudAvg(a,b);
       au+='<div class="night"><span>'+label+'</span><b>Kp '+top.toFixed(1)+'</b><i class="'+cls+'">'+txt+'</i>'+(cc!=null?'<i class="cl '+cloudWord(cc)[0]+'" style="display:block">'+cloudWord(cc)[1]+' ('+Math.round(cc)+'% cloud)</i>':'')+'</div>'; }
-    au+='</div><p class="note">Kp measures how disturbed Earth’s magnetic field is, from 0 (calm) to 9 (major storm). Forecasts more than a day out are rough; look '+(loc.lat>=0?'north':'south')+', away from streetlights, and phone cameras often pick up aurora your eyes miss.</p>'; }
+    au+='</div><p class="note">Kp measures how disturbed Earth’s magnetic field is, from 0 (calm) to 9 (major storm). Forecasts more than a day out are rough; look '+(loc.lat>=0?'north':'south')+', away from streetlights, and phone cameras often pick up aurora your eyes miss. <a href="spaceweather.html">Live solar wind and storm forecast →</a></p>'; }
   out.push(au+'</section>');
   $('content').innerHTML=out.join(''); }
 

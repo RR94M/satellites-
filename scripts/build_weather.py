@@ -13,6 +13,7 @@ GFS is a US government product (public domain). GDACS is run by the European Com
 """
 import base64
 import json
+import re
 import os
 import sys
 import time
@@ -263,10 +264,10 @@ def space_alerts(directory):
         days = []  # watches list the expected level for each day, e.g. "Oct 08: G2 (Moderate)"
         k = next((i for i, l in enumerate(lines) if l.lower().startswith("highest storm level predicted by day")), None)
         if k is not None:
-            for l in lines[k + 1:k + 4]:
-                if not l: break
-                days.append(" ".join(l.split()))
-        out.append({"id": a.get("product_id"), "issued": issued.strftime("%Y-%m-%dT%H:%MZ"), "kind": head.split(":")[0].title(), "days": days,
+            text = " ".join(" ".join(lines[k + 1:k + 4]).split())
+            days = re.findall(r"[A-Z][a-z]{2} \d{1,2}:\s*[^:]+?(?=\s+[A-Z][a-z]{2} \d{1,2}:|\s+THIS |\s+Comment|$)", text)
+        comment = next((l.split(":", 1)[1].strip() for l in lines if l.lower().startswith("comment:")), None)
+        out.append({"id": a.get("product_id"), "issued": issued.strftime("%Y-%m-%dT%H:%MZ"), "kind": head.split(":")[0].title(), "days": days, "comment": comment,
                     "headline": head.split(":", 1)[1].strip(), "scale": field("NOAA Scale"), "validFrom": field("Valid From"),
                     "validTo": field("Valid To"), "impacts": impacts})
     out.sort(key=lambda x: x["issued"], reverse=True)

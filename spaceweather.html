@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Space weather - Overhead</title>
+<script>try{var p=localStorage.getItem('ovh:theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p}catch(e){document.documentElement.dataset.theme='dark'}</script>
+<meta name="description" content="Space weather now: the live Sun, solar wind, flares, CMEs heading for Earth, geomagnetic storms and what it all means for aurora, GPS, radio and satellites.">
+<meta property="og:title" content="Space weather - Overhead">
+<meta property="og:description" content="The live Sun, solar wind, flares and storms, and what they mean for aurora, GPS and radio.">
+<meta property="og:type" content="website">
+<script src="lib/tz-lookup.js"></script>
+<script src="lib/localtime.js"></script>
+<script src="lib/aurora.js"></script>
+<script src="lib/where.js"></script>
+<script src="lib/calendar.js"></script>
+<script src="lib/spacewx.js"></script>
+<style>
+/* Space Grotesk, self-hosted (SIL Open Font License, see fonts/OFL.txt) */
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/space-grotesk-latin-600-normal.woff2) format("woff2")}
+:root{
+  --bg:#0B1424; --panel:#152540; --panel2:#1C3050; --line:#2A4469;
+  --ink:#EAF0F8; --ink2:#A9BAD2; --ink3:#7489A8;
+  --accent:#F2B340; --onaccent:#0F1A2E;
+  /* storm levels: a status scale, always shown with words too */
+  --l0:#5F86B8; --l1:#7FE0C6; --l2:#F2D14A; --l3:#FF9F43; --l4:#FF5A5A;
+  --wind:#8CD1FF; --flux:#FFB86B; --ssn:#C9B3FF; --grid:#22395C;
+  --sunglow:rgba(255,170,60,.35);
+}
+:root[data-theme="light"]{
+  --bg:#EDF2F8; --panel:#FFFFFF; --panel2:#F3F6FB; --line:#D3DDEA;
+  --ink:#13223A; --ink2:#3E5476; --ink3:#5A6E8C;
+  --accent:#B45309; --onaccent:#FFFFFF;
+  --l0:#5B7FAF; --l1:#0F766E; --l2:#A16207; --l3:#C2410C; --l4:#B42318;
+  --wind:#0369A1; --flux:#C2410C; --ssn:#6D28D9; --grid:#E3EAF3;
+  --sunglow:rgba(255,150,40,.25);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;
+  padding:max(14px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+main{max-width:760px;margin:0 auto;display:grid;gap:14px}
+a{color:var(--ink2)}
+header{display:grid;gap:6px}
+nav.pages{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+nav.pages a{flex:1;text-align:center;padding:7px 4px;border-radius:7px;text-decoration:none;color:var(--ink2);font-size:14px;white-space:nowrap}
+nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
+@media (max-width:420px){nav.pages .lg{display:none} nav.pages a{font-size:13px}}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:0}
+button{font:inherit;font-size:14px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 10px;font-size:13px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--onaccent);font-weight:500}
+section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+section>h2{font-size:18px;font-weight:600;margin:0 0 2px;display:flex;align-items:center;gap:8px}
+.sub{color:var(--ink3);font-size:13px;margin:0 0 12px}
+.note{color:var(--ink3);font-size:12px;margin:10px 0 0}
+.big{font-size:28px;font-weight:600;letter-spacing:-.01em;line-height:1.1}
+.lvlword{font-weight:600}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
+.c0{color:var(--l0)}.c1{color:var(--l1)}.c2{color:var(--l2)}.c3{color:var(--l3)}.c4{color:var(--l4)}
+.b0{background:var(--l0)}.b1{background:var(--l1)}.b2{background:var(--l2)}.b3{background:var(--l3)}.b4{background:var(--l4)}
+
+/* hero: the live Sun and the headline */
+.hero{display:grid;grid-template-columns:minmax(150px,240px) 1fr;gap:18px;align-items:center;background:radial-gradient(120% 140% at 0% 50%,var(--sunglow),transparent 60%),var(--panel)}
+.sun{position:relative;aspect-ratio:1;border-radius:50%;overflow:hidden;background:#000;box-shadow:0 0 40px 6px var(--sunglow)}
+.sun img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.04)}
+.sun .err{position:absolute;inset:0;display:grid;place-items:center;color:#aaa;font-size:12px;text-align:center;padding:20px}
+.sunbtns{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;justify-content:center}
+.sunbtns button{font-size:12px;padding:3px 9px;border-radius:999px;background:transparent;color:var(--ink2)}
+.sunbtns button.on{border-color:var(--accent);color:var(--ink)}
+.credit{color:var(--ink3);font-size:11px;text-align:center;margin-top:4px}
+.headline .eyebrow{color:var(--ink3);font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+.headline .big{font-size:34px;margin:2px 0 6px}
+.headline p{margin:0;color:var(--ink2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;background:var(--panel2)}
+@media (max-width:560px){.hero{grid-template-columns:1fr;justify-items:center;text-align:center}.sun{width:min(240px,70vw)}.chips{justify-content:center}}
+
+/* what it means for you */
+.effects{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.eff{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel2)}
+.eff .h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.eff .h b{font-weight:600}
+.eff .st{font-size:12px;font-weight:600;white-space:nowrap}
+.eff p{margin:4px 0 0;color:var(--ink2);font-size:13px}
+
+/* NOAA scales */
+.scales{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.scale{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--panel2)}
+.scale .t{font-size:13px;color:var(--ink3)}
+.scale .now{display:flex;align-items:baseline;gap:8px;margin:2px 0 8px}
+.scale .now b{font-size:30px;font-weight:600}
+.meter{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:10px}
+.meter i{height:8px;border-radius:4px;background:var(--line)}
+.days{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:12px}
+.days div{border-top:1px solid var(--line);padding-top:6px}
+.days span{display:block;color:var(--ink3)}
+
+/* charts */
+.chartbox{position:relative}
+.chartbox svg{display:block;width:100%;overflow:visible}
+svg .grid{stroke:var(--grid);stroke-width:1}
+svg .axis{fill:var(--ink3);font-size:11px;font-family:inherit}
+svg .band{opacity:.22}
+svg .bandlab{fill:var(--ink3);font-size:11px;font-weight:600;font-family:inherit}
+svg .ref{stroke-width:1.5;stroke-dasharray:4 4}
+svg .reflab{font-size:11px;font-weight:600;font-family:inherit;paint-order:stroke;stroke:var(--panel);stroke-width:4px;stroke-linejoin:round}
+svg .now{stroke:var(--ink3);stroke-width:1;stroke-dasharray:2 3}
+svg .hover{stroke:var(--ink2);stroke-width:1;pointer-events:none}
+svg .hdot{stroke:var(--panel);stroke-width:2;pointer-events:none}
+.tip{position:absolute;top:0;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.25);transform:translate(-50%,-110%);display:none;z-index:2}
+.tip b{font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink2);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.legend i.ln{height:2px;border-radius:1px;vertical-align:3px;width:14px}
+.legend i.dash{height:0;border-top:2px dashed;background:none!important;width:14px;vertical-align:3px}
+.windgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.stat{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+.stat b{font-size:22px;font-weight:600}
+.stat span{color:var(--ink3);font-size:12px}
+.flarelist{display:grid;gap:4px;margin-top:10px;font-size:13px}
+.flarelist div{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:4px}
+.cme{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel2);margin-top:8px}
+.coronagraph{width:100%;max-width:320px;border-radius:12px;display:block;margin-top:10px;background:#000}
+.al{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;border-top:1px solid var(--line);padding:10px 0}
+.al:first-of-type{border-top:0}
+.al .ic{font-size:20px;grid-row:span 3}
+.al .d{color:var(--ink2);font-size:13px}
+.al .m{color:var(--ink3);font-size:12px}
+.cal summary{font-size:13px;display:inline-block;border:1px solid var(--line);border-radius:8px;padding:5px 10px;color:var(--ink);cursor:pointer;list-style:none;margin-top:6px}
+.cal summary::-webkit-details-marker{display:none}
+.calmenu{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:6px}
+.calmenu a,.calmenu button{font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;text-decoration:none;color:var(--ink);background:var(--panel)}
+footer{color:var(--ink3);font-size:12px;max-width:760px;margin:16px auto 0}
+.loading{color:var(--ink3)}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <nav class="pages" aria-label="Pages"><a href="./">Live globe</a><a href="tonight.html">Tonight<span class="lg">’s sky</span></a><a href="launches.html">Launches</a><a href="alerts.html">Alerts</a></nav>
+    <div class="top"><h1>Space weather</h1><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
+  </header>
+  <div id="content"><section><p class="loading">Loading the latest from the Sun…</p></section></div>
+</main>
+<footer>Data: <a href="https://www.swpc.noaa.gov" target="_blank" rel="noopener">NOAA Space Weather Prediction Center</a> (scales, Kp, solar wind from the DSCOVR/ACE spacecraft, GOES X-rays and protons, sunspot numbers, alerts), <a href="https://ccmc.gsfc.nasa.gov/tools/DONKI/" target="_blank" rel="noopener">NASA DONKI</a> (CME arrival models), images of the Sun from <a href="https://sdo.gsfc.nasa.gov" target="_blank" rel="noopener">NASA’s Solar Dynamics Observatory</a> and the coronagraph from <a href="https://soho.nascom.nasa.gov" target="_blank" rel="noopener">ESA/NASA SOHO</a>. All public domain. Charts refresh every hour; the newest values are fetched straight from NOAA when your browser allows it. For interest, not for operational use.</footer>
+<script>
+(async function(){
+const WX='https://raw.githubusercontent.com/RR94M/satellites-/weather/', SWPC='https://services.swpc.noaa.gov/';
+const $=id=>document.getElementById(id);
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- theme ----------
+let themePref='auto'; try{ themePref=localStorage.getItem('ovh:theme')||'auto'; }catch(e){}
+const mq=matchMedia('(prefers-color-scheme: light)');
+function applyTheme(){ document.documentElement.dataset.theme=themePref==='auto'?(mq.matches?'light':'dark'):themePref; document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===themePref)); }
+document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=b.dataset.t; try{ localStorage.setItem('ovh:theme',themePref); }catch(e){} applyTheme(); if(window.__draw) window.__draw(); });
+mq.addEventListener('change',()=>{ if(themePref==='auto'){ applyTheme(); if(window.__draw) window.__draw(); } }); applyTheme();
+
+const loc=WHERE.saved(), LT=loc?localTime(loc.lat,loc.lon):null;
+const T=s=>Date.parse(/[zZ]$|[+-]\d\d:?\d\d$/.test(s)?s:s+'Z'); // NOAA times are UTC, sometimes without the Z
+const timeOf=t=>LT?LT.time(t):new Date(t).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+const dayOf=t=>LT?LT.date(t,{weekday:'short',day:'numeric',month:'short'}):new Date(t).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
+const ago=t=>{ const m=Math.round((Date.now()-t)/6e4); return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' days ago'; };
+
+// ---------- data: this site's hourly copy, then the newest values straight from NOAA where the browser allows ----------
+const getj=(u,ms=10000)=>{ const c=new AbortController(), t=setTimeout(()=>c.abort(),ms); return fetch(u,{cache:'no-store',signal:c.signal}).then(r=>r.ok?r.json():null).catch(()=>null).finally(()=>clearTimeout(t)); };
+let D=null, ALERTS=null;
+async function load(){ const [d,a]=await Promise.all([getj(WX+'space.json'),getj(WX+'space-alerts.json')]); D=d; ALERTS=a; if(!D) return;
+  const [scales,xr,wind,mag]=await Promise.all([getj(SWPC+'products/noaa-scales.json',6000),getj(SWPC+'json/goes/primary/xrays-1-day.json',6000),getj(SWPC+'json/rtsw/rtsw_wind_1m.json',6000),getj(SWPC+'json/rtsw/rtsw_mag_1m.json',6000)]);
+  if(scales&&scales['0']) D.scales=scales;
+  if(Array.isArray(xr)&&xr.length) D.xray=xr.filter(r=>r.energy==='0.1-0.8nm'&&r.flux>0).map(r=>[r.time_tag,r.flux]);
+  if(Array.isArray(wind)&&wind.length&&Array.isArray(mag)){ const m={}; for(const r of mag) m[(r.time_tag||'').slice(0,16).replace(' ','T')]=r; const cut=Date.now()-864e5;
+    const w=wind.map(r=>{ const k=(r.time_tag||'').slice(0,16).replace(' ','T'), g=m[k]||{}; return [k,r.proton_speed,r.proton_density,g.bz_gsm,g.bt]; }).filter(r=>T(r[0])>cut&&r[1]!=null).sort((a,b)=>T(a[0])-T(b[0]));
+    if(w.length>20) D.wind=w; } }
+
+// ---------- helpers ----------
+const lvlOfKp=k=>k>=7?4:k>=6?3:k>=5?2:k>=4?1:0;
+const KPWORD=['Quiet','Unsettled','Minor storm (G1)','Moderate storm (G2)','Strong storm or worse (G3+)'];
+const scaleNum=x=>x==null||x===''?0:+x;
+function flareClass(f){ if(!(f>0)) return '–'; const L=[['X',1e-4],['M',1e-5],['C',1e-6],['B',1e-7],['A',1e-8]]; for(const [c,b] of L) if(f>=b) return c+(f/b).toFixed(1); return 'A'+(f/1e-8).toFixed(1); }
+const classLvl=c=>({X:4,M:3,C:1,B:0,A:0})[(c||'A')[0]]??0;
+
+// ---------- charts: plain SVG sized to the screen, with a hover/tap readout ----------
+function chart(box,o){ const W=box.clientWidth||600, H=o.h||150, pl=o.pl||40, pr=o.pr||34, pt=10, pb=22, iw=W-pl-pr, ih=H-pt-pb;
+  const x=t=>pl+(t-o.x0)/(o.x1-o.x0)*iw, ly=v=>o.log?Math.log10(Math.max(v,o.yMin)):v, y=v=>pt+ih-(ly(v)-ly(o.yMin))/(ly(o.yMax)-ly(o.yMin))*ih, cl=v=>Math.max(pt,Math.min(pt+ih,y(v)));
+  let s='<svg viewBox="0 0 '+W+' '+H+'" height="'+H+'" role="img" aria-label="'+esc(o.label)+'">';
+  for(const b of o.bands||[]) s+='<rect class="band" x="'+pl+'" width="'+iw+'" y="'+cl(b.y1)+'" height="'+(cl(b.y0)-cl(b.y1))+'" fill="'+b.fill+'"/>'+(b.label?'<text class="bandlab" x="'+(pl+iw+5)+'" y="'+((cl(b.y0)+cl(b.y1))/2+4)+'">'+b.label+'</text>':'');
+  for(const g of o.yTicks||[]) s+='<line class="grid" x1="'+pl+'" x2="'+(pl+iw)+'" y1="'+y(g[0])+'" y2="'+y(g[0])+'"/><text class="axis" x="'+(pl-6)+'" y="'+(y(g[0])+4)+'" text-anchor="end">'+g[1]+'</text>';
+  for(const g of o.xTicks||[]) s+='<text class="axis" x="'+x(g[0])+'" y="'+(H-5)+'" text-anchor="middle">'+g[1]+'</text>';
+  if(o.now&&o.now>o.x0&&o.now<o.x1) s+='<line class="now" x1="'+x(o.now)+'" x2="'+x(o.now)+'" y1="'+pt+'" y2="'+(pt+ih)+'"/><text class="axis" x="'+(x(o.now)+4)+'" y="'+(pt+10)+'">now</text>';
+  for(const se of o.bars||[]){ const bw=Math.max(2,iw/((o.x1-o.x0)/se.step)-2);
+    for(const [t,v,col,op] of se.pts) s+='<rect x="'+(x(t)+1).toFixed(1)+'" y="'+y(v).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1,(y(o.yMin)-y(v))).toFixed(1)+'" rx="2" fill="'+col+'" opacity="'+(op||1)+'"/>'; }
+  for(const se of o.series||[]){ const pts=se.pts.filter(p=>p[1]!=null&&(!o.log||p[1]>0)); if(pts.length<2) continue;
+    const d='M'+pts.map(p=>x(p[0]).toFixed(1)+','+cl(p[1]).toFixed(1)).join('L');
+    if(se.fill) s+='<path d="'+d+'L'+x(pts[pts.length-1][0]).toFixed(1)+','+cl(se.fillTo??o.yMin)+'L'+x(pts[0][0]).toFixed(1)+','+cl(se.fillTo??o.yMin)+'Z" fill="'+se.color+'" opacity=".14"/>';
+    s+='<path d="'+d+'" fill="none" stroke="'+se.color+'" stroke-width="'+(se.width||2)+'"'+(se.dash?' stroke-dasharray="5 4"':'')+' stroke-linejoin="round" stroke-linecap="round"/>'; }
+  // reference lines go on top of the data so their labels stay readable
+  for(const r of o.refs||[]) s+='<line class="ref" stroke="'+r.color+'" x1="'+pl+'" x2="'+(pl+iw)+'" y1="'+y(r.y)+'" y2="'+y(r.y)+'"/><text class="reflab" fill="'+r.color+'" x="'+(pl+4)+'" y="'+(y(r.y)-4)+'">'+esc(r.label)+'</text>';
+  s+='<line class="hover" x1="0" x2="0" y1="'+pt+'" y2="'+(pt+ih)+'" visibility="hidden"/><circle class="hdot" r="4" visibility="hidden"/><rect class="hit" x="'+pl+'" y="0" width="'+iw+'" height="'+H+'" fill="transparent"/></svg><div class="tip"></div>';
+  box.innerHTML=s;
+  // readout: nearest point of the first series (or bar)
+  const svg=box.querySelector('svg'), tip=box.querySelector('.tip'), hl=svg.querySelector('.hover'), hd=svg.querySelector('.hdot'), base=(o.series&&o.series[0]&&o.series[0].pts)||(o.bars&&o.bars[0].pts)||[];
+  const pts=base.filter(p=>p[1]!=null&&(!o.log||p[1]>0)); if(!pts.length) return;
+  const move=e=>{ const r=svg.getBoundingClientRect(), px=(e.clientX-r.left)*W/r.width; let best=pts[0], bd=1e9; for(const p of pts){ const d=Math.abs(x(p[0])-px); if(d<bd){ bd=d; best=p; } }
+    const X=x(best[0]), Y=cl(best[1]); hl.setAttribute('x1',X); hl.setAttribute('x2',X); hl.setAttribute('visibility','visible'); hd.setAttribute('cx',X); hd.setAttribute('cy',Y); hd.setAttribute('fill',o.tipColor?o.tipColor(best):(o.series?o.series[0].color:'var(--ink)')); hd.setAttribute('visibility','visible');
+    tip.innerHTML=o.tip(best); tip.style.display='block'; tip.style.left=Math.max(60,Math.min(r.width-60,X*r.width/W))+'px'; tip.style.top=(Y*r.height/H)+'px'; };
+  const hide=()=>{ tip.style.display='none'; hl.setAttribute('visibility','hidden'); hd.setAttribute('visibility','hidden'); };
+  svg.addEventListener('pointermove',move); svg.addEventListener('pointerdown',move); svg.addEventListener('pointerleave',hide); }
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function dayTicks(x0,x1){ const out=[]; const d=new Date(x0); d.setHours(0,0,0,0); for(let t=d.getTime()+864e5;t<x1;t+=864e5) out.push([t,new Date(t).toLocaleDateString(undefined,{weekday:'short'})]); return out; }
+function hourTicks(x0,x1,step){ const out=[]; for(let t=Math.ceil(x0/(step*36e5))*step*36e5;t<x1;t+=step*36e5) out.push([t,timeOf(t)]); return out; }
+
+// ---------- sections ----------
+const SUNS={'0193':'Corona','0171':'Loops','0131':'Flares','HMIIC':'Sunspots'};
+let sunPick='0193';
+function sunImg(){ const v=Math.floor(Date.now()/9e5); return 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_'+sunPick+'.jpg?v='+v; }
+
+function hero(){ const sc=D.scales||{}, now=sc['0']||{}, G=scaleNum(now.G&&now.G.Scale), R=scaleNum(now.R&&now.R.Scale), S=scaleNum(now.S&&now.S.Scale);
+  const kp=(D.kp||[]).slice(-1)[0], kpNow=kp?kp[1]:null, xr=(D.xray||[]).slice(-1)[0], cls=xr?flareClass(xr[1]):'–', w=(D.wind||[]).slice(-1)[0];
+  let word='Quiet', lv=0; if(G>=1){ word=['','Minor','Moderate','Strong','Severe','Extreme'][G]+' geomagnetic storm'; lv=Math.min(4,G+1); } else if(kpNow>=4){ word='Active'; lv=1; } else if(kpNow>=3){ word='Unsettled'; lv=0; }
+  if(R>=1&&lv<2){ word+=' · radio blackout'; lv=Math.max(lv,R>=3?3:2); } if(S>=1){ word+=' · radiation storm'; lv=Math.max(lv,S>=3?3:2); }
+  // what's coming: the biggest storm level forecast for the next 3 days
+  let ahead=''; const fut=[1,2,3].map(k=>sc[k]).filter(Boolean); const gmax=fut.reduce((m,d)=>Math.max(m,scaleNum(d.G&&d.G.Scale)),0);
+  if(gmax>=1){ const d=fut.find(d=>scaleNum(d.G&&d.G.Scale)===gmax); ahead=' A '+['','minor','moderate','strong','severe','extreme'][gmax]+' geomagnetic storm (G'+gmax+') is forecast for '+new Date(d.DateStamp+'T12:00Z').toLocaleDateString(undefined,{weekday:'long'})+': aurora further from the poles than usual.'; }
+  const lede=(lv===0?'The Sun and Earth’s magnetic field are calm right now.':lv===1?'Earth’s magnetic field is a little stirred up.':'Things are lively out there.')+ahead;
+  return '<section class="hero"><div><div class="sun"><img id="sunimg" src="'+sunImg()+'" alt="The Sun right now, seen by NASA’s Solar Dynamics Observatory" onerror="this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'err\',textContent:\'The live Sun image couldn’t load.\'}))"></div>'
+    +'<div class="sunbtns" id="sunbtns">'+Object.entries(SUNS).map(([k,v])=>'<button data-sun="'+k+'"'+(k===sunPick?' class="on"':'')+'>'+v+'</button>').join('')+'</div><div class="credit">The Sun right now · NASA/SDO</div></div>'
+    +'<div class="headline"><div class="eyebrow">Space weather now</div><div class="big c'+lv+'">'+esc(word)+'</div><p>'+esc(lede)+'</p>'
+    +'<div class="chips"><span class="chip"><span class="dot b'+lvlOfKp(kpNow||0)+'"></span>Kp '+(kpNow!=null?kpNow.toFixed(1):'–')+'</span><span class="chip"><span class="dot b'+classLvl(cls)+'"></span>X-rays '+cls+'</span>'
+    +(w?'<span class="chip"><span class="dot '+(w[3]<-5?'b3':w[3]<0?'b1':'b0')+'"></span>Solar wind '+Math.round(w[1])+' km/s</span>':'')+'</div>'
+    +'<p class="note">Updated '+ago(T(D.updated))+'. Tap the Sun’s buttons for different views.</p></div></section>'; }
+
+function effects(){ const sc=D.scales||{}, now=sc['0']||{}, G=scaleNum(now.G&&now.G.Scale), R=scaleNum(now.R&&now.R.Scale), S=scaleNum(now.S&&now.S.Scale);
+  const kpNow=((D.kp||[]).slice(-1)[0]||[])[1]||0, ahead=(D.kpForecast||[]).filter(r=>T(r[0])>Date.now()&&T(r[0])<Date.now()+3*864e5);
+  const peak=ahead.reduce((m,r)=>!m||r[1]>m[1]?r:m,null), soon=peak?peak[1]:0, peakDay=peak?new Date(T(peak[0])).toLocaleDateString(undefined,{weekday:'long'}):'';
+  const fcTxt=peak&&soon>kpNow+0.3?' Forecast to reach Kp '+soon.toFixed(1)+' on '+peakDay+'.':'';
+  const need=loc?AURORA.kpNeeded(loc.lat,loc.lon):null, best=Math.max(kpNow,soon);
+  const elec=(ALERTS&&ALERTS.alerts||[]).some(a=>/Electron/i.test(a.headline)&&Date.now()-Date.parse(a.issued)<864e5);
+  const E=[
+    ['🟢','Aurora',need==null?(best>=5?[2,'Storm']:[0,'Normal']):kpNow>=need?[2,'Possible now']:best>=need?[1,'Possible '+peakDay]:[0,'Unlikely'],
+      (need==null?'Kp '+kpNow.toFixed(1)+' now.'+fcTxt+' Share your location on the globe for your own aurora line.':'You need about Kp '+need.toFixed(1)+' where you are; it’s '+kpNow.toFixed(1)+' now.'+fcTxt)],
+    ['📍','GPS and navigation',G>=3||R>=3||S>=3?[2,'Errors possible']:G>=2?[1,'Small errors']:[0,'Normal'],G>=3?'Position errors can grow, especially near the poles.':'Phone and car GPS working as normal.'],
+    ['📻','Radio (shortwave, aviation)',R>=3?[3,'Blackouts']:R>=1?[1,'Brief blackouts']:[0,'Normal'],R>=1?'Short blackouts on the sunlit side of Earth after flares.':'No flare-driven blackouts right now.'],
+    ['🛰️','Satellites',G>=3||S>=3?[2,'Under stress']:elec?[1,'Charging risk']:[0,'Normal'],elec?'High-energy electrons around Earth can upset satellite electronics.':G>=3?'Extra drag and charging; operators may take precautions.':'Normal conditions in orbit.'],
+    ['⚡','Power grids',G>=4?[3,'Possible issues']:G>=3?[1,'Alarms possible']:[0,'Normal'],G>=3?'Grid operators at high latitudes may see voltage alarms.':'No effect.'],
+    ['✈️','Astronauts and polar flights',S>=2?[2,'Raised radiation']:S>=1?[1,'Slightly raised']:[0,'Normal'],S>=1?'More radiation on polar routes and for spacewalks.':'Radiation at normal levels.']];
+  return '<section><h2>What it means for you</h2><p class="sub">Right now, in plain words.</p><div class="effects">'+E.map(([ic,name,[l,st],d])=>'<div class="eff"><div class="h"><b>'+ic+' '+esc(name)+'</b><span class="st c'+(l===0?1:l>=3?4:l>=2?3:2)+'"><span class="dot b'+(l===0?1:l>=3?4:l>=2?3:2)+'"></span>'+esc(st)+'</span></div><p>'+esc(d)+'</p></div>').join('')+'</div></section>'; }
+
+function scales(){ const sc=D.scales||{}; if(!sc['0']) return '';
+  const day=k=>sc[k]?new Date(sc[k].DateStamp+'T12:00Z').toLocaleDateString(undefined,{weekday:'short'}):'';
+  const card=(L,name,desc,now,next)=>{ const n=scaleNum(now&&now.Scale); const col=n>=3?4:n>=2?3:n>=1?2:1;
+    return '<div class="scale"><div class="t">'+esc(name)+'</div><div class="now"><b class="c'+(n?col:0)+'">'+L+n+'</b><span>'+esc(now&&now.Text&&now.Text!=='none'?now.Text:'None')+'</span></div>'
+      +'<div class="meter" aria-label="Level '+n+' of 5">'+[1,2,3,4,5].map(i=>'<i class="'+(i<=n?'b'+(i>=4?4:i>=3?3:i>=2?3:2):'')+'"></i>').join('')+'</div>'
+      +'<div class="note" style="margin:0 0 6px">'+esc(desc)+'</div><div class="days">'+[1,2,3].map(k=>'<div><span>'+day(k)+'</span>'+next(sc[k]||{})+'</div>').join('')+'</div></div>'; };
+  return '<section><h2>NOAA space weather scales</h2><p class="sub">Each runs from 0 (none) to 5 (extreme). Today’s level, then the next three days.</p><div class="scales">'
+    +card('G','G · Geomagnetic storms','Aurora, GPS and power grids. Caused by solar wind and CMEs.',sc['0'].G,d=>{ const g=scaleNum(d.G&&d.G.Scale); return '<b class="c'+(g>=3?4:g>=2?3:g>=1?2:0)+'">G'+g+'</b> '+(g?esc(d.G.Text):'none'); })
+    +card('R','R · Radio blackouts','Shortwave and aviation radio. Caused by solar flares.',sc['0'].R,d=>'Minor '+(d.R&&d.R.MinorProb!=null?d.R.MinorProb+'%':'–')+'<br>Major '+(d.R&&d.R.MajorProb!=null?d.R.MajorProb+'%':'–'))
+    +card('S','S · Radiation storms','Astronauts, polar flights and satellites. Caused by solar protons.',sc['0'].S,d=>'S1+ '+(d.S&&d.S.Prob!=null?d.S.Prob+'%':'–'))
+    +'</div></section>'; }
+
+function kpSection(){ return '<section><h2>Geomagnetic activity (Kp)</h2><p class="sub">How disturbed Earth’s magnetic field is, every 3 hours: the past 4 days and NOAA’s forecast. Higher Kp pushes aurora further from the poles.'+(loc?' The dashed line is the level you need for aurora where you are.':'')+'</p><div class="chartbox" id="kpChart"></div>'
+  +'<div class="legend">'+[0,1,2,3,4].map(l=>'<span><i class="b'+l+'"></i>'+KPWORD[l]+'</span>').join('')+'<span><i style="background:var(--ink3);opacity:.45"></i>Forecast (lighter)</span></div></section>'; }
+function drawKp(){ const box=$('kpChart'); if(!box) return; const now=Date.now(), x0=now-4*864e5, x1=now+3*864e5;
+  const obs=(D.kp||[]).map(r=>[T(r[0]),r[1]]).filter(p=>p[0]>=x0), lastObs=obs.length?obs[obs.length-1][0]:0;
+  const fc=(D.kpForecast||[]).map(r=>[T(r[0]),r[1],r[2]]).filter(p=>p[0]>lastObs&&p[0]<x1);
+  const col=k=>css('--l'+lvlOfKp(k));
+  const bars=obs.map(p=>[p[0],p[1],col(p[1]),1]).concat(fc.map(p=>[p[0],p[1],col(p[1]),.45]));
+  const need=loc?AURORA.kpNeeded(loc.lat,loc.lon):null;
+  chart(box,{label:'Kp index: past 4 days and 3-day forecast',h:170,x0,x1,yMin:0,yMax:9,now,bars:[{step:3*36e5,pts:bars}],
+    yTicks:[[0,'0'],[3,'3'],[5,'5'],[7,'7'],[9,'9']],xTicks:dayTicks(x0,x1),refs:need!=null&&need<9?[{y:need,label:'Your aurora line · Kp '+need.toFixed(1),color:css('--accent')}]:[],
+    tip:p=>'<b>Kp '+p[1].toFixed(2)+'</b> · '+KPWORD[lvlOfKp(p[1])]+'<br>'+dayOf(p[0])+' '+timeOf(p[0])+'–'+timeOf(p[0]+3*36e5)+(p[3]<1?' (forecast)':''),tipColor:p=>col(p[1])}); }
+
+function windSection(){ const w=D.wind||[]; if(!w.length) return '<section><h2>Solar wind</h2><p class="note">Solar wind data isn’t available right now.</p></section>';
+  const last=w[w.length-1], spd=last[1], den=last[2], bz=last[3], mins=spd?Math.round(1.5e6/spd/60):null;
+  const bzWord=bz==null?'':bz<-10?'pointing strongly south: aurora switching on':bz<-3?'pointing south: good for aurora':bz<0?'slightly south':'pointing north: aurora unlikely';
+  return '<section><h2>Solar wind arriving now</h2><p class="sub">Measured by spacecraft 1.5 million km towards the Sun'+(mins?', so this reaches Earth in about <b>'+mins+' minutes</b>':'')+'. When Bz turns south and the wind speeds up, aurora follows.</p>'
+    +'<div class="windgrid"><div><div class="stat"><span>Speed</span><b>'+(spd?Math.round(spd):'–')+' <small>km/s</small></b></div><div class="chartbox" id="wSpd"></div></div>'
+    +'<div><div class="stat"><span>Density</span><b>'+(den!=null?den.toFixed(1):'–')+' <small>per cm³</small></b></div><div class="chartbox" id="wDen"></div></div>'
+    +'<div><div class="stat"><span>Bz (north/south)</span><b class="'+(bz<-3?'c3':bz<0?'c2':'c1')+'">'+(bz!=null?(bz>0?'+':'')+bz.toFixed(1):'–')+' <small>nT</small></b></div><div class="chartbox" id="wBz"></div><div class="note" style="margin-top:4px">'+esc(bzWord)+'</div></div></div>'
+    +'<p class="note">Past 24 hours. Typical: 300–500 km/s, 1–10 particles per cm³, Bz within ±5 nT.</p></section>'; }
+function drawWind(){ const w=(D.wind||[]).map(r=>[T(r[0]),r[1],r[2],r[3]]); if(!w.length||!$('wSpd')) return; const x1=w[w.length-1][0], x0=x1-864e5, xt=hourTicks(x0,x1,8);
+  const S=w.map(r=>[r[0],r[1]]), Dn=w.map(r=>[r[0],r[2]]), B=w.map(r=>[r[0],r[3]]);
+  const smax=Math.max(700,...S.map(p=>p[1]||0))*1.05, dmax=Math.max(10,...Dn.map(p=>p[1]||0))*1.1, bmax=Math.max(10,...B.map(p=>Math.abs(p[1]||0)))*1.1;
+  chart($('wSpd'),{label:'Solar wind speed, past day',h:110,pl:36,pr:8,x0,x1,yMin:200,yMax:smax,series:[{pts:S,color:css('--wind'),fill:true}],yTicks:[[400,'400'],[600,'600']],xTicks:xt,tip:p=>'<b>'+Math.round(p[1])+' km/s</b><br>'+timeOf(p[0])});
+  chart($('wDen'),{label:'Solar wind density, past day',h:110,pl:36,pr:8,x0,x1,yMin:0,yMax:dmax,series:[{pts:Dn,color:css('--wind'),fill:true}],yTicks:[[5,'5'],[10,'10']].filter(t=>t[0]<dmax),xTicks:xt,tip:p=>'<b>'+p[1].toFixed(1)+' /cm³</b><br>'+timeOf(p[0])});
+  chart($('wBz'),{label:'Interplanetary magnetic field Bz, past day',h:110,pl:36,pr:8,x0,x1,yMin:-bmax,yMax:bmax,
+    bands:[{y0:-bmax,y1:0,fill:css('--l3'),label:''}],series:[{pts:B,color:css('--ink'),width:1.6}],yTicks:[[0,'0'],[Math.round(-bmax/2),String(Math.round(-bmax/2))],[Math.round(bmax/2),'+'+Math.round(bmax/2)]],xTicks:xt,
+    tip:p=>'<b>'+(p[1]>0?'+':'')+p[1].toFixed(1)+' nT</b> '+(p[1]<0?'(south)':'(north)')+'<br>'+timeOf(p[0])}); }
+
+function flareSection(){ const xr=D.xray||[], last=xr.slice(-1)[0], cls=last?flareClass(last[1]):'–';
+  const fl=(D.flares||[]).map(f=>({t:T(f.max_time),c:f.max_class})).filter(f=>f.c);
+  const day=fl.filter(f=>f.t>Date.now()-864e5), top=a=>a.reduce((m,f)=>!m||flareRank(f.c)>flareRank(m.c)?f:m,null), d1=top(day), d7=top(fl);
+  const big=fl.filter(f=>/^[MX]/.test(f.c)).sort((a,b)=>b.t-a.t).slice(0,6);
+  return '<section><h2>Solar flares</h2><p class="sub">X-rays from the Sun measured by NOAA’s GOES satellite. Each class is ten times stronger than the one below; M and X flares can cause radio blackouts on the sunlit side of Earth.</p>'
+    +'<div class="windgrid" style="margin-bottom:8px"><div class="stat"><span>Right now</span><b class="c'+classLvl(cls)+'">'+cls+'</b></div><div class="stat"><span>Biggest, past day</span><b class="c'+classLvl(d1&&d1.c)+'">'+(d1?esc(d1.c):'–')+'</b></div><div class="stat"><span>Biggest, past week</span><b class="c'+classLvl(d7&&d7.c)+'">'+(d7?esc(d7.c):'–')+'</b></div></div>'
+    +'<div class="chartbox" id="xChart"></div>'
+    +(big.length?'<div class="flarelist">'+big.map(f=>'<div><span><span class="dot b'+classLvl(f.c)+'"></span><b>'+esc(f.c)+'</b> flare</span><span>'+dayOf(f.t)+' '+timeOf(f.t)+'</span></div>').join('')+'</div>':'<p class="note">No M or X flares in the past week.</p>')+'</section>'; }
+const flareRank=c=>({A:0,B:1,C:2,M:3,X:4})[c[0]]*100+parseFloat(c.slice(1)||0);
+function drawFlares(){ const box=$('xChart'); if(!box) return; const xr=(D.xray||[]).map(r=>[T(r[0]),r[1]]).filter(p=>p[1]>0); if(!xr.length) return; const x1=xr[xr.length-1][0], x0=x1-864e5;
+  const band=(a,b,l,c)=>({y0:a,y1:b,label:l,fill:c});
+  chart(box,{label:'Solar X-ray flux, past day',h:170,pr:24,x0,x1,log:true,yMin:1e-8,yMax:1e-3,
+    bands:[band(1e-8,1e-7,'A','transparent'),band(1e-7,1e-6,'B','transparent'),band(1e-6,1e-5,'C',css('--grid')),band(1e-5,1e-4,'M',css('--l2')),band(1e-4,1e-3,'X',css('--l4'))],
+    series:[{pts:xr,color:css('--flux')}],yTicks:[[1e-7,''],[1e-6,''],[1e-5,''],[1e-4,'']],xTicks:hourTicks(x0,x1,6),
+    tip:p=>'<b>'+flareClass(p[1])+'</b><br>'+timeOf(p[0])}); }
+
+function cmeSection(){ const list=(D.cmes||[]).filter(c=>T(c.arrival)>Date.now()-864e5);
+  const v=Math.floor(Date.now()/9e5);
+  return '<section><h2>CMEs heading for Earth</h2><p class="sub">Coronal mass ejections are huge clouds of solar material. When one hits Earth it can set off a geomagnetic storm and strong aurora, usually 1–4 days after leaving the Sun.</p>'
+    +(list.length?list.map((c,i)=>{ const t=T(c.arrival), past=t<Date.now();
+      return '<div class="cme"><b>'+(c.glancing?'Glancing blow':'Direct hit')+' '+(past?'arrived':'expected')+' '+dayOf(t)+', around '+timeOf(t)+'</b>'
+        +'<div class="note" style="margin-top:2px">Left the Sun '+(c.launched?dayOf(T(c.launched))+' '+timeOf(T(c.launched)):'recently')+(c.speed?' at '+Math.round(c.speed).toLocaleString()+' km/s':'')+(c.kp?' · NASA’s model suggests up to Kp '+c.kp:'')+'. Arrival times are usually right to within 6–12 hours.</div>'
+        +(!past?CALENDAR.menu({title:'CME expected (aurora watch)',start:t-6*36e5,end:t+6*36e5,detail:'A coronal mass ejection is forecast to reach Earth around '+timeOf(t)+'. Watch for aurora that night.',alarmMinutes:60,url:location.href}):'')+'</div>'; }).join('')
+      :'<p class="note" style="margin-top:0">No Earth-directed CMEs in NASA’s models right now.</p>')
+    +'<img class="coronagraph" src="https://soho.nascom.nasa.gov/data/realtime/c3/1024/latest.jpg?v='+v+'" alt="Live coronagraph image from SOHO: the Sun is blocked out so its outer atmosphere and CMEs show up" loading="lazy" onerror="this.remove()"><div class="note">Live view from the SOHO spacecraft with the Sun blocked out (white circle): CMEs show up as expanding clouds.</div></section>'; }
+
+function protonSection(){ return '<section><h2>Solar radiation</h2><p class="sub">High-energy protons from the Sun (above 10 MeV), measured by GOES. Above the dashed line is a radiation storm (S1+).</p><div class="chartbox" id="pChart"></div></section>'; }
+function drawProtons(){ const box=$('pChart'); if(!box) return; const p=(D.protons||[]).map(r=>[T(r[0]),r[1]]).filter(q=>q[1]>0); if(!p.length) return; const x1=p[p.length-1][0], x0=x1-864e5;
+  chart(box,{label:'Proton flux above 10 MeV, past day',h:140,x0,x1,log:true,yMin:.1,yMax:1e4,series:[{pts:p,color:css('--l1')}],refs:[{y:10,label:'S1 radiation storm',color:css('--l3')}],
+    yTicks:[[1,'1'],[100,'100'],[1e4,'10k']],xTicks:hourTicks(x0,x1,6),tip:q=>'<b>'+(q[1]<10?q[1].toFixed(2):Math.round(q[1]))+' pfu</b><br>'+timeOf(q[0])}); }
+
+function cycleSection(){ return '<section><h2>The solar cycle</h2><p class="sub">The Sun’s activity rises and falls over about 11 years, tracked by counting sunspots. We’re around the peak of Cycle 25, which is why aurora has been seen so often lately.</p><div class="chartbox" id="cChart"></div>'
+  +'<div class="legend"><span><i class="ln" style="background:var(--ssn);opacity:.45"></i>Monthly sunspot number</span><span><i class="ln" style="background:var(--ssn)"></i>Smoothed</span><span><i class="dash" style="border-color:var(--ink3)"></i>NOAA prediction</span></div></section>'; }
+function drawCycle(){ const box=$('cChart'); if(!box) return; const m=t=>Date.parse(t+'-15T00:00Z');
+  const raw=(D.cycle||[]).map(r=>[m(r[0]),r[1]]), sm=(D.cycle||[]).filter(r=>r[2]>0).map(r=>[m(r[0]),r[2]]), pr=(D.cyclePrediction||[]).map(r=>[m(r[0]),r[1]]);
+  if(!raw.length) return; const x0=m('1996-01'), x1=Math.max(...pr.map(p=>p[0]),raw[raw.length-1][0]);
+  const xt=[]; for(let y=2000;y<=2030;y+=5) xt.push([m(y+'-01'),String(y)]);
+  chart(box,{label:'Sunspot number since 1996 with NOAA prediction',h:170,pr:12,x0,x1,yMin:0,yMax:Math.max(250,...raw.map(p=>p[1]||0)),now:Date.now(),
+    series:[{pts:sm,color:css('--ssn'),width:2.5},{pts:raw,color:css('--ssn'),width:1},{pts:pr,color:css('--ink3'),dash:true}],
+    yTicks:[[100,'100'],[200,'200']],xTicks:xt,tip:p=>'<b>'+Math.round(p[1])+'</b> smoothed sunspots<br>'+new Date(p[0]).toLocaleDateString(undefined,{month:'short',year:'numeric'})}); }
+
+function alertsSection(){ const list=[], seen=new Set(); for(const a of (ALERTS&&ALERTS.alerts)||[]){ const k=a.kind+a.headline; if(seen.has(k)) continue; seen.add(k); list.push(a); }
+  return '<section><h2>NOAA alerts and warnings</h2><p class="sub">The past three days, in plain English.</p>'+(list.length?list.slice(0,8).map(a=>'<div class="al"><span class="ic">'+(a.kind==='Watch'?'👀':a.kind.includes('Warning')?'⚠️':'☀️')+'</span><b>'+esc(SPACEWX.plain(a.headline))+'</b>'
+    +'<span class="d">'+(a.days&&a.days.length?'Expected: '+esc(a.days.join(' · ')):(a.impacts&&a.impacts[0]?esc(a.impacts[0]):''))+(a.comment?'<br>'+esc(a.comment):'')+'</span><span class="m">'+esc(a.kind)+' issued '+ago(Date.parse(a.issued))+' · NOAA: “'+esc(a.headline)+'”</span></div>').join('')
+    :'<p class="note">No alerts in the past three days: a quiet spell.</p>')+'</section>'; }
+
+// ---------- page ----------
+function render(){ if(!D){ $('content').innerHTML='<section><p class="note">Couldn’t load space weather right now. Check your connection and reload.</p></section>'; return; }
+  CALENDAR.reset();
+  $('content').innerHTML=hero()+effects()+scales()+kpSection()+windSection()+flareSection()+cmeSection()+protonSection()+cycleSection()+alertsSection();
+  document.querySelectorAll('#sunbtns [data-sun]').forEach(b=>b.onclick=()=>{ sunPick=b.dataset.sun; const img=$('sunimg'); if(img) img.src=sunImg(); document.querySelectorAll('#sunbtns button').forEach(x=>x.classList.toggle('on',x===b)); });
+  draw(); }
+function draw(){ drawKp(); drawWind(); drawFlares(); drawProtons(); drawCycle(); }
+window.__draw=draw;
+let rt=null; window.addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(draw,150); });
+await load(); render();
+setInterval(async()=>{ if(document.visibilityState!=='visible'||CALENDAR.isOpen()) return; await load(); render(); },10*6e4);
+})();
+</script>
+</body>
+</html>

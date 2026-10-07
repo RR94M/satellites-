@@ -15,6 +15,7 @@
 <script src="lib/aurora.js"></script>
 <script src="lib/where.js"></script>
 <script src="lib/sky.js"></script>
+<script src="lib/spacewx.js"></script>
 <style>
 /* Space Grotesk, self-hosted (SIL Open Font License, see fonts/OFL.txt) */
 @font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
@@ -203,17 +204,8 @@ function world(){ const all=worldItems(), counts={}; all.forEach(x=>counts[x.typ
     +(list.length>LIMIT&&!showAll?'<button class="more" id="showAll">Show all '+list.length+'</button>':'')+'</section>'; }
 
 // ---------- 3. space weather ----------
-const PLAIN=[[/Geomagnetic Storm Category G(\d) Predicted/i,m=>'A '+['','minor','moderate','strong','severe','extreme'][+m[1]]+' geomagnetic storm (G'+m[1]+') is expected: aurora further from the poles than usual'],
-  [/Geomagnetic K-index of (\d)( expected)?/i,m=>(m[2]?'Expected: ':'')+'Earth’s magnetic field '+(+m[1]>=5?'is stormy':'is unsettled')+' (Kp '+m[1]+')'+(+m[1]>=5?', so aurora can reach lower latitudes':'')],
-  [/Geomagnetic Sudden Impulse/i,()=>'A burst of solar wind has just hit Earth’s magnetic field'],
-  [/X-ray Flux exceeded M(\d)|X-ray Event exceeded X/i,()=>'A strong solar flare: short radio blackouts are possible on the sunlit side of Earth'],
-  [/Proton Event/i,()=>'A solar radiation storm: higher radiation for astronauts and on polar flights'],
-  [/Electron 2MeV Integral Flux/i,()=>'High-energy electrons are building up around Earth: they can upset satellites (no effect on the ground)'],
-  [/Type II Radio Emission/i,()=>'A radio burst from the Sun, usually the sign of a big eruption heading out into space'],
-  [/Type IV Radio Emission/i,()=>'A long radio burst from the Sun, often linked to a major eruption'],
-  [/10cm Radio Burst/i,()=>'A burst of radio noise from the Sun, usually with a solar flare']];
-function plain(h){ for(const [re,f] of PLAIN){ const m=h.match(re); if(m) return f(m); } return h; }
-function space(){ let h='<section><h2>Space weather</h2><p class="sub">The Sun’s activity affects aurora, satellites, GPS and radio for the whole planet at once. From NOAA’s Space Weather Prediction Center.</p>';
+const plain=SPACEWX.plain; // lib/spacewx.js
+function space(){ let h='<section><h2>Space weather</h2><p class="sub">The Sun’s activity affects aurora, satellites, GPS and radio for the whole planet at once. From NOAA’s Space Weather Prediction Center. <a href="spaceweather.html"><b>Open the full space weather page →</b></a> (live Sun, solar wind, flares, CMEs).</p>';
   if(Array.isArray(D.kp)){ const now=Date.now(), past=D.kp.map(x=>({t:Date.parse(x.time_tag+'Z'),kp:+x.kp,kind:x.observed})).filter(x=>x.t<=now&&isFinite(x.kp)), cur=past[past.length-1];
     if(cur) h+='<div class="kp"><b>Kp '+cur.kp.toFixed(1)+'</b><span>'+AURORA.level(cur.kp)+' right now (0 is calm, 9 is a severe storm)</span></div>'; }
   const alerts=(D.space&&D.space.alerts)||[], seen=new Set(), list=[];
