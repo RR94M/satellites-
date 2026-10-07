@@ -115,6 +115,10 @@ button.primary{background:var(--accent);color:var(--onaccent);border-color:var(-
 #cmp .me{fill:var(--accent)}
 #cmp b{display:block;font-size:17px;font-weight:600}
 #cmp span{display:block;font-size:12px;color:var(--hud2);margin-top:2px}
+#cmp .calib{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:8px}
+#cmp .calib button{font-size:13px;padding:5px 10px;background:transparent;color:var(--hud);border-color:var(--line)}
+#cmp .calib button.link{border:0;text-decoration:underline;color:var(--hud2);padding:0}
+#cmp .ch{font-size:11px;margin-top:6px}
 .viewbtns button{background:var(--hudbtn);color:var(--hud);border-color:var(--line)}
 #label{position:absolute;pointer-events:none;color:var(--accent);font-size:13px;font-weight:500;transform:translate(10px,-8px);white-space:nowrap;text-shadow:0 1px 3px var(--halo),0 0 2px var(--halo)}
 #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--veil);color:var(--hud);text-align:center;padding:24px;font-size:15px}
@@ -221,7 +225,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     <button id="cmpBtn" aria-label="Compass: which way am I facing?" title="Compass"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4.5 L15 12 H9Z" fill="var(--accent)"/><path d="M12 19.5 L9 12 H15Z" fill="currentColor" opacity=".6"/></svg></button>
     <button id="youBtn" aria-label="My location" title="My location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-6.1-6.5-11a6.5 6.5 0 0 1 13 0c0 4.9-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.6" fill="currentColor"/></svg></button>
     <button id="youTime" aria-label="Your place and its local time: fly the globe there"><span id="youPlace"></span><b id="youClock"></b><small id="youZone"></small></button>
-    <div id="cmp" role="dialog" aria-label="Compass"><button class="x" id="cmpClose" aria-label="Close compass">×</button><svg viewBox="-70 -70 140 140" aria-hidden="true"><g class="dial" id="cmpDial"><circle class="ring" r="60"/><g id="cmpTicks"></g><text class="n" y="-46">N</text><text x="46">E</text><text y="46">S</text><text x="-46">W</text></g><path class="me" d="M0,-66 L7,-52 H-7Z"/><circle r="3" class="me"/></svg><b id="cmpDir">Starting…</b><span id="cmpNote">Hold your phone flat, top pointing the way you’re facing.</span></div>
+    <div id="cmp" role="dialog" aria-label="Compass"><button class="x" id="cmpClose" aria-label="Close compass">×</button><svg viewBox="-70 -70 140 140" aria-hidden="true"><g class="dial" id="cmpDial"><circle class="ring" r="60"/><g id="cmpTicks"></g><text class="n" y="-46">N</text><text x="46">E</text><text y="46">S</text><text x="-46">W</text></g><path class="me" d="M0,-66 L7,-52 H-7Z"/><circle r="3" class="me"/></svg><b id="cmpDir">Starting…</b><span id="cmpNote">Hold your phone flat, top pointing the way you’re facing.</span><div class="calib"><button id="cmpSet">Set as north</button><button class="link" id="cmpUnset" hidden>Undo</button></div><span class="ch" id="cmpCalNote">Reading wrong? Point the top of your phone at something you know is north, then tap “Set as north”.</span></div>
     <div class="timebar" id="timebar"><button id="tPlay" aria-label="Play time forward fast">▶</button><input type="range" id="tRange" min="-720" max="1440" step="1" value="0" aria-label="Time, in minutes from now"><button id="tNow" class="on">Live</button></div>
     <div class="viewbtns"><button id="reset">Reset view</button><button id="follow" style="display:none">Fly to it</button></div>
   </div>
@@ -586,11 +590,17 @@ function updateSel(){ if(!sel||!sel.ok) return; const f=(n,d)=>n.toFixed(d);
   document.getElementById('fromYou').style.display=me?'':'none'; document.getElementById('sel-el').textContent=me?(sel.el>0?Math.round(sel.el)+'° above horizon':'below horizon'):'-'; }
 document.getElementById('clearX').onclick=()=>select(null);
 // ---------- compass: which way you're facing, from the phone's own compass sensor ----------
+// a correction saved with "Set as north" (degrees to add), shared with the light finder
+function compassOffset(){ try{ return (+localStorage.getItem('ovh:northFix')||0)%360; }catch(e){ return 0; } }
 (function(){ const btn=document.getElementById('cmpBtn'), box=document.getElementById('cmp'), dial=document.getElementById('cmpDial'), dirEl=document.getElementById('cmpDir'), note=document.getElementById('cmpNote');
   let t=''; for(let a=0;a<360;a+=30) if(a%90) t+='<line class="tick" x1="0" y1="-60" x2="0" y2="-53" transform="rotate('+a+')"/>'; document.getElementById('cmpTicks').innerHTML=t;
   const NAMES=['north','north-east','east','south-east','south','south-west','west','north-west'];
-  let on=false, shown=null, last=0, timer=null, kind=null;
-  function show(h){ // smooth, taking the short way round 359 -> 0
+  let on=false, shown=null, last=0, timer=null, kind=null, raw=null;
+  const setBtn=document.getElementById('cmpSet'), unsetBtn=document.getElementById('cmpUnset'), calNote=document.getElementById('cmpCalNote');
+  function calLabel(){ const o=compassOffset(); unsetBtn.hidden=!o; calNote.textContent=o?'Calibrated: corrected by '+Math.round(o>180?o-360:o)+'°. Saved on this phone.':'Reading wrong? Point the top of your phone at something you know is north, then tap “Set as north”.'; }
+  setBtn.onclick=()=>{ if(raw==null) return; try{ localStorage.setItem('ovh:northFix',String((360-raw)%360)); }catch(e){} shown=null; calLabel(); };
+  unsetBtn.onclick=()=>{ try{ localStorage.removeItem('ovh:northFix'); }catch(e){} shown=null; calLabel(); };
+  function show(h){ raw=h; h=(h+compassOffset())%360; // smooth, taking the short way round 359 -> 0
     if(shown===null) shown=h; else { let d=((h-shown+540)%360)-180; shown=(shown+d*.35+360)%360; }
     dial.style.transform='rotate('+(-shown).toFixed(1)+'deg)';
     const name=NAMES[Math.round(shown/45)%8]; dirEl.textContent='Facing '+name; note.textContent=Math.round(shown)+'° from north. Hold your phone flat, top pointing ahead.'; }
@@ -600,7 +610,7 @@ document.getElementById('clearX').onclick=()=>select(null);
     if(h==null) return; const turn=(screen.orientation&&typeof screen.orientation.angle==='number')?screen.orientation.angle:(window.orientation||0);
     last=Date.now(); const now=performance.now(); if(now-(onOrient.t||0)<60) return; onOrient.t=now; show((h+turn+360)%360); }
   function stop(){ on=false; box.classList.remove('on'); btn.style.display=''; if(kind) window.removeEventListener(kind,onOrient); kind=null; clearTimeout(timer); }
-  async function start(){ on=true; shown=null; last=0; box.classList.add('on'); btn.style.display='none'; dirEl.textContent='Finding north…'; note.textContent='Hold your phone flat, top pointing the way you’re facing.';
+  async function start(){ on=true; shown=null; last=0; raw=null; calLabel(); box.classList.add('on'); btn.style.display='none'; dirEl.textContent='Finding north…'; note.textContent='Hold your phone flat, top pointing the way you’re facing.';
     const DOE=window.DeviceOrientationEvent;
     if(!DOE){ dirEl.textContent='No compass'; note.textContent='This browser can’t read a compass. Try on your phone.'; return; }
     if(typeof DOE.requestPermission==='function'){ // iPhone asks first
@@ -609,7 +619,8 @@ document.getElementById('clearX').onclick=()=>select(null);
     kind='ondeviceorientationabsolute' in window?'deviceorientationabsolute':'deviceorientation'; window.addEventListener(kind,onOrient);
     timer=setTimeout(()=>{ if(on&&!last){ dirEl.textContent='No compass found'; note.textContent='This device doesn’t have a compass (most laptops don’t). Try on your phone.'; } },3000); }
   btn.onclick=start; document.getElementById('cmpClose').onclick=stop; })();
-document.getElementById('reset').onclick=()=>{ flyTo(new THREE.Vector3(0,8,22)); };
+// reset: back over your location, or over the UK if you haven't shared one
+document.getElementById('reset').onclick=()=>{ const dir=me?youMarker.position.clone().normalize():onSphere(54.5,-3,1).normalize(); flyTo(dir.multiplyScalar(R*3.2)); };
 followBtn.onclick=()=>{ if(!sel||!sel.ok) return; const p=new THREE.Vector3(sel.x,sel.y,sel.z); const d=Math.max(p.length()*1.4,R*2.6); flyTo(p.clone().normalize().multiplyScalar(d)); };
 let fly=null; function flyTo(target){ fly={from:camera.position.clone(),to:target,t:0}; }
 
@@ -777,7 +788,7 @@ setAurBtn(); loadAurora(); setInterval(loadAurora,10*60e3);
     if(alpha==null||e.beta==null||e.gamma==null) return;
     const a=alpha*D2R, b=e.beta*D2R, g=e.gamma*D2R, sa=Math.sin(a), ca=Math.cos(a), sb=Math.sin(b), cb=Math.cos(b), sg=Math.sin(g), cg=Math.cos(g);
     const x=-(cg*sa*sb+ca*sg), y=-(sa*sg-ca*cg*sb), z=-cb*cg; // east, north, up
-    aim={az:(Math.atan2(x,y)/D2R+360)%360, el:Math.asin(Math.max(-1,Math.min(1,z)))/D2R}; gotSensor=Date.now(); }
+    aim={az:(Math.atan2(x,y)/D2R+compassOffset()+360)%360, el:Math.asin(Math.max(-1,Math.min(1,z)))/D2R}; gotSensor=Date.now(); }
   async function startSensor(){ const DOE=window.DeviceOrientationEvent;
     if(!DOE) return 'none';
     if(typeof DOE.requestPermission==='function'){ try{ if(await DOE.requestPermission()!=='granted') return 'denied'; }catch(e){ return 'denied'; } }
