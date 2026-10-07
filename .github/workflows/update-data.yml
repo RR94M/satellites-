@@ -68,6 +68,18 @@ jobs:
           python3 scripts/build_crew.py out || echo "::warning::crew.json not built"
           true
 
+      - name: Satellite trains and aurora forecast
+        # Never fails the job: the Tonight page simply leaves out anything that is missing.
+        run: |
+          set -uo pipefail
+          pip install -q sgp4 && python3 scripts/build_trains.py out || echo "::warning::trains.json not built"
+          for attempt in 1 2 3; do
+            code=$(curl -sS -o out/kp-forecast.json -w '%{http_code}' https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json) || code=000
+            if [ "$code" = 200 ] && python3 -c "import json,sys;json.load(open(sys.argv[1]))" out/kp-forecast.json; then echo "kp: ok"; break; fi
+            echo "::warning::kp attempt $attempt got HTTP $code"; rm -f out/kp-forecast.json; sleep 20
+          done
+          true
+
       - name: Publish to the data branch
         run: |
           set -euo pipefail
