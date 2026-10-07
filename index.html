@@ -123,6 +123,26 @@ button.primary{background:var(--accent);color:var(--onaccent);border-color:var(-
 #cmp .calib button.link{border:0;text-decoration:underline;color:var(--hud2);padding:0}
 #cmp .ch{font-size:11px;margin-top:6px}
 .viewbtns button{background:var(--hudbtn);color:var(--hud);border-color:var(--line)}
+/* layers */
+#layers .grp{display:grid;gap:6px}
+#layers .grp h4{margin:0;font-size:12px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em}
+#layers .tog{display:flex;flex-wrap:wrap;gap:6px}
+#layers .tog button{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:13px;background:transparent;color:var(--ink2)}
+#layers .tog button.on{color:var(--ink);border-color:var(--accent);background:var(--panel2)}
+#layers .tog button i{font-style:normal}
+#layers .lnote{font-size:12px;color:var(--ink3)}
+#stormList{display:grid;gap:6px}
+#stormList button{display:block;text-align:left;width:100%;padding:8px 10px;border-radius:8px;background:var(--panel2);font-size:13px;line-height:1.35}
+#stormList button b{font-size:14px}
+#stormList button small{display:block;color:var(--ink3)}
+#stormList .fc{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;font-size:12px;color:var(--ink2);margin-top:4px}
+.stormtag{position:absolute;pointer-events:auto;cursor:pointer;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#fff;white-space:nowrap;text-shadow:0 1px 3px #000,0 0 2px #000}
+.stormtag i{font-style:normal;font-size:20px;line-height:1;display:inline-block;animation:spin 3s linear infinite}
+.stormtag.south i{animation-direction:reverse}
+.stormtag span{background:rgba(160,30,30,.85);border-radius:6px;padding:1px 6px;text-shadow:none}
+.stormtag.ts span{background:rgba(180,110,20,.85)}
+@keyframes spin{to{transform:rotate(-360deg)}}
+@media (prefers-reduced-motion:reduce){.stormtag i{animation:none}}
 #label{position:absolute;pointer-events:none;color:var(--accent);font-size:13px;font-weight:500;transform:translate(10px,-8px);white-space:nowrap;text-shadow:0 1px 3px var(--halo),0 0 2px var(--halo)}
 #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--veil);color:var(--hud);text-align:center;padding:24px;font-size:15px}
 #loading span{display:block;color:var(--hud2);font-size:13px;margin-top:6px}
@@ -224,6 +244,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     </div>
     <div class="clock"><span id="utc">--:--:--</span>UTC<em id="simLbl"></em></div>
     <div id="label"></div>
+    <div id="stormTags"></div>
     <div id="loading"><div><b>Loading the satellite catalogue</b><span id="loadmsg">Fetching orbital elements from CelesTrak...</span></div></div>
     <div class="hint">Drag to spin. Scroll or pinch to zoom. Tap a dot to follow it.</div>
     <button id="cmpBtn" aria-label="Compass: which way am I facing?" title="Compass"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4.5 L15 12 H9Z" fill="var(--accent)"/><path d="M12 19.5 L9 12 H15Z" fill="currentColor" opacity=".6"/></svg></button>
@@ -260,7 +281,12 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
       <div class="row"><button id="share">Share</button></div>
     </div>
     <div id="aur"><button id="aurBtn" class="on" aria-pressed="true"><i></i>Aurora</button><div id="aurTxt">Loading the aurora forecast…</div><div class="note" id="aurKey"></div></div>
-    <details class="more" id="filters"><summary>Filter what’s on the globe <small id="filterSum"></small></summary><div class="morebody">
+    <details class="more" id="layers" open><summary>Layers <small id="layerSum"></small></summary><div class="morebody">
+      <div class="grp"><h4>Earth weather</h4><div class="tog"><button data-layer="clouds"><i>☁️</i>Clouds</button><button data-layer="wind"><i>💨</i>Wind</button><button data-layer="storms"><i>🌀</i>Storms</button></div><div class="lnote" id="wxNote"></div><div id="stormList"></div></div>
+      <div class="grp"><h4>Space</h4><div class="tog"><button data-layer="aurora"><i>🟢</i>Aurora</button><button data-layer="night"><i>🌗</i>Day &amp; night</button></div></div>
+      <div class="grp"><h4>Map</h4><div class="tog"><button data-layer="borders"><i>🗺️</i>Country borders</button></div></div>
+    </div></details>
+    <details class="more" id="filters"><summary>Satellites shown <small id="filterSum"></small></summary><div class="morebody">
     <div class="chips" id="chips"></div>
     <div class="row">
       <button id="allon">Show all</button>
@@ -278,7 +304,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     </div></details>
     <details class="more"><summary>Display and about</summary><div class="morebody">
     <div class="row"><span class="note">Colours</span><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
-    <div class="note">Satellite details come from the live <a href="https://celestrak.org/satcat/" target="_blank" rel="noopener">CelesTrak catalogue</a> and the <a href="https://www.ucs.org/resources/satellite-database" target="_blank" rel="noopener">UCS Satellite Database</a>. Positions are computed in your browser from orbital elements published by <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a> on <span id="epoch"></span>. The darker half of the globe is where it's night right now. The gold line is the followed satellite's path over the next 90 minutes, and the shaded circle is the area it can be seen from right now. Distances are to scale.</div>
+    <div class="note">Satellite details come from the live <a href="https://celestrak.org/satcat/" target="_blank" rel="noopener">CelesTrak catalogue</a> and the <a href="https://www.ucs.org/resources/satellite-database" target="_blank" rel="noopener">UCS Satellite Database</a>. Positions are computed in your browser from orbital elements published by <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a> on <span id="epoch"></span>. The darker half of the globe is where it's night right now. The gold line is the followed satellite's path over the next 90 minutes, and the shaded circle is the area it can be seen from right now. Distances are to scale. Weather layers: cloud cover and wind from NOAA’s <a href="https://www.ncei.noaa.gov/products/weather-climate-models/global-forecast" target="_blank" rel="noopener">GFS forecast model</a> (refreshed hourly), tropical storms from <a href="https://www.gdacs.org" target="_blank" rel="noopener">GDACS</a> (European Commission and UN). Storm tracks and forecasts are for interest only; for safety, follow your local weather service.</div>
     </div></details>
   </div>
 </div>
@@ -461,7 +487,7 @@ async function loadAurora(){
   if(d||!aurData){ aurData=d; drawAurora(); } }
 const aurBtn=document.getElementById('aurBtn');
 function setAurBtn(){ aurBtn.classList.toggle('on',aurOn); aurBtn.setAttribute('aria-pressed',aurOn); aurora.visible=viewLines.visible=aurOn; describeAurora(); }
-aurBtn.onclick=()=>{ aurOn=!aurOn; try{ localStorage.setItem('ovh:aurora',aurOn?'on':'off'); }catch(e){} setAurBtn(); };
+aurBtn.onclick=()=>{ aurOn=!aurOn; try{ localStorage.setItem('ovh:aurora',aurOn?'on':'off'); }catch(e){} setAurBtn(); if(typeof layerButtons==='function') layerButtons(); };
 const starMat=new THREE.PointsMaterial({color:0x9DB4D1,size:.5,sizeAttenuation:false,transparent:true,opacity:.5});
 (function(){ const n=1500,p=new Float32Array(n*3); for(let i=0;i<n;i++){ const u=Math.random()*2-1,th=Math.random()*6.2832,rr=Math.sqrt(1-u*u); const v=new THREE.Vector3(rr*Math.cos(th),u,rr*Math.sin(th)).multiplyScalar(300); p.set([v.x,v.y,v.z],i*3);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3)); scene.add(new THREE.Points(g,starMat)); })();
 
@@ -770,6 +796,7 @@ function tick(force){ const fnow=performance.now(), dt=fnow-lastFrame; lastFrame
   if(sel&&sel.ok){ selMarker.position.set(sel.x,sel.y,sel.z); selMarker.lookAt(camera.position); const sc=0.02*camera.position.distanceTo(selMarker.position); selMarker.scale.setScalar(sc*5);
     const v=selMarker.position.clone().project(camera); const r=renderer.domElement.getBoundingClientRect(); const behind=v.z>1||(selMarker.position.length()<camera.position.length()&&camera.position.distanceTo(selMarker.position)>Math.sqrt(camera.position.lengthSq()-R*R)+Math.sqrt(Math.max(0,selMarker.position.lengthSq()-R*R)));
     label.style.display=behind?'none':'block'; selMarker.visible=!behind; label.style.left=((v.x+1)/2*r.width)+'px'; label.style.top=((1-v.y)/2*r.height)+'px'; }
+  placeStormTags();
   if(fly){ fly.t=Math.min(1,fly.t+0.03); const e=1-Math.pow(1-fly.t,3); camera.position.lerpVectors(fly.from,fly.to,e); if(fly.t>=1) fly=null; }
   const alt=camera.position.length()-R, ms=Math.max(.12,Math.min(1,alt/(R*1.4))); youMarker.scale.setScalar(ms); youRing.scale.setScalar(ms); controls.rotateSpeed=Math.max(.03,Math.min(.6,.6*alt/(R*2))); controls.zoomSpeed=alt<R*.5?.5:.8;
   controls.update(); renderer.render(scene,camera); requestAnimationFrame(()=>tick(false)); }
@@ -780,7 +807,7 @@ function applyTheme(){ const name=themePref==='auto'?(darkMq.matches?'light':'da
   if(earth.userData.theme!==name){ const old=earth.material.map; earth.material.map=makeTexture(); earth.material.needsUpdate=true; if(old) old.dispose(); earth.userData.theme=name; }
   renderer.setClearColor(TH.clear); atmo.material.color.setHex(TH.atmo); atmo.material.opacity=TH.atmoOp; starMat.opacity=TH.stars; amb.intensity=TH.ambient; sun.intensity=TH.sun;
   for(const m of [selMarker,trackLine,fpSel,cone,disc]) m.material.color.setHex(TH.sel); fpAll.material.color.setHex(TH.fp); youMarker.material.color.setHex(TH.you); youRing.material.color.setHex(TH.you);
-  mat.uniforms.outline.value.set(...TH.outline); night.material.uniforms.tint.value.set(...TH.night); drawAurora(); coastMat.color.set(TH.coast); borderMat.color.set(TH.border);
+  mat.uniforms.outline.value.set(...TH.outline); night.material.uniforms.tint.value.set(...TH.night); drawAurora(); coastMat.color.set(TH.coast); borderMat.color.set(TH.border); try{ windColours(); }catch(e){} // the wind layer may not be set up yet on first load
   const cs=getComputedStyle(document.documentElement); cols=G.map((_,i)=>cs.getPropertyValue('--c'+i).trim());
   sats.forEach((s,i)=>{ const gi=s.groups.length?s.groups[0]:-1; const c=new THREE.Color(gi>=0?cols[gi]:TH.other); col.set([c.r,c.g,c.b],i*3); }); geo.attributes.color.needsUpdate=true;
   document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===themePref)); }
@@ -788,6 +815,113 @@ document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=
 darkMq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); });
 applyTheme();
 setAurBtn(); loadAurora(); setInterval(loadAurora,10*60e3);
+// ---------- layers: clouds, wind and storms (Earth weather), aurora and day/night (space), borders (map) ----------
+// Clouds and wind: NOAA's GFS model on a 1-degree grid; storms: GDACS. Both copied hourly to the `weather` branch.
+const WX='https://raw.githubusercontent.com/RR94M/satellites-/weather/';
+let LAYERS={clouds:false,wind:false,storms:true,night:true,borders:true}; try{ Object.assign(LAYERS,JSON.parse(localStorage.getItem('ovh:layers')||'{}')); }catch(e){}
+let borderLines=null, WXD=null, wxLoading=null, STORMS=null;
+const saveLayers=()=>{ try{ localStorage.setItem('ovh:layers',JSON.stringify(LAYERS)); }catch(e){} };
+const ago=t=>{ const m=Math.round((Date.now()-Date.parse(t))/6e4); return m<60?m+' min ago':Math.round(m/60)+' h ago'; };
+
+// clouds: a soft white shell just above the land, dimmed by the night shade like everything else
+const cloudCanvas=document.createElement('canvas'); cloudCanvas.width=1440; cloudCanvas.height=720;
+const cloudTex=new THREE.CanvasTexture(cloudCanvas);
+const clouds=new THREE.Mesh(new THREE.SphereGeometry(R*1.0011,128,96),new THREE.MeshBasicMaterial({map:cloudTex,transparent:true,depthWrite:false}));
+clouds.renderOrder=0.9; clouds.visible=false; scene.add(clouds);
+function drawClouds(){ if(!WXD) return; const W=WXD.w, H=WXD.h, small=document.createElement('canvas'); small.width=360; small.height=H;
+  const sg=small.getContext('2d'), img=sg.createImageData(360,H);
+  let A=new Float32Array(360*H); for(let y=0;y<H;y++) for(let x=0;x<360;x++) A[y*360+x]=WXD.cloud[y*W+((x+180)%360)];
+  for(let pass=0;pass<2;pass++){ const B=new Float32Array(A.length); // soften the 1-degree squares
+    for(let y=0;y<H;y++) for(let x=0;x<360;x++){ let sum=0,n=0; for(let dy=-1;dy<=1;dy++){ const yy=y+dy; if(yy<0||yy>=H) continue; for(let dx=-1;dx<=1;dx++){ sum+=A[yy*360+(x+dx+360)%360]; n++; } } B[y*360+x]=sum/n; } A=B; }
+  for(let i=0;i<A.length;i++){ const a=Math.max(0,Math.min(1,(A[i]-20)/80)), k=i*4; img.data[k]=img.data[k+1]=img.data[k+2]=255; img.data[k+3]=Math.round(Math.pow(a,1.6)*190); }
+  sg.putImageData(img,0,0); const g=cloudCanvas.getContext('2d'); g.clearRect(0,0,1440,720); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(small,0,0,1440,720); cloudTex.needsUpdate=true; }
+
+// wind: streaks carried along by the 10 m wind; brighter = stronger
+const NW=matchMedia('(pointer:fine)').matches?3500:1800, TRAIL=9;
+const windPos=new Float32Array(NW*(TRAIL-1)*2*3), windCol=new Float32Array(NW*(TRAIL-1)*2*3);
+const windGeo=new THREE.BufferGeometry(); windGeo.setAttribute('position',new THREE.BufferAttribute(windPos,3)); windGeo.setAttribute('color',new THREE.BufferAttribute(windCol,3));
+const wind=new THREE.LineSegments(windGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.85,depthWrite:false}));
+wind.renderOrder=1.7; wind.frustumCulled=false; wind.visible=false; scene.add(wind);
+const parts=[]; for(let i=0;i<NW;i++) parts.push({lat:0,lon:0,age:0,max:0,trail:[]});
+function windAt(lat,lon){ const W=WXD.w, H=WXD.h, y=Math.max(0,Math.min(H-1.001,90-lat)), x=((lon%360)+360)%360, x0=Math.floor(x), y0=Math.floor(y), x1=(x0+1)%360, fx=x-x0, fy=y-y0;
+  const at=(arr,xx,yy)=>arr[yy*W+xx]/2, mix=arr=>(at(arr,x0,y0)*(1-fx)+at(arr,x1,y0)*fx)*(1-fy)+(at(arr,x0,y0+1)*(1-fx)+at(arr,x1,y0+1)*fx)*fy;
+  return [mix(WXD.u),mix(WXD.v)]; }
+function respawn(p){ p.lat=Math.asin(Math.random()*2-1)*180/Math.PI*.98; p.lon=Math.random()*360-180; p.age=0; p.max=40+Math.random()*70; p.trail.length=0; }
+parts.forEach(p=>{ respawn(p); p.age=Math.random()*p.max; });
+const slowCol=new THREE.Color(), fastCol=new THREE.Color(), tmpCol=new THREE.Color();
+function windColours(){ const light=TH===THEMES.light; slowCol.set(light?'#7E92B0':'#7FA0C8'); fastCol.set(light?'#0B2550':'#FFFFFF');
+  wind.material.blending=light?THREE.NormalBlending:THREE.AdditiveBlending; wind.material.needsUpdate=true;
+  stormPast.color.set(light?'#13223A':'#FFFFFF'); stormFc.color.set(light?'#13223A':'#FFFFFF'); coneMat.color.set(light?'#B45309':'#FFD08A'); } // dark mode: streaks glow and fade to nothing
+function stepWind(){ if(!WXD) return; let k=0; const r=R*1.003;
+  for(const p of parts){ const [u,v]=windAt(p.lat,p.lon), sp=Math.hypot(u,v);
+    p.lat+=v*.028; p.lon+=u*.028/Math.max(.2,Math.cos(p.lat*Math.PI/180)); p.age++;
+    if(p.age>p.max||Math.abs(p.lat)>88||sp<.3) respawn(p);
+    const q=onSphere(p.lat,p.lon,r); p.trail.push(q); if(p.trail.length>TRAIL) p.trail.shift();
+    tmpCol.copy(slowCol).lerp(fastCol,Math.min(1,sp/18)); const fade=Math.min(1,p.age/6,(p.max-p.age)/6);
+    for(let i=0;i<TRAIL-1;i++){ const a=p.trail[i]||q, b=p.trail[i+1]||q, w=fade*(i+1)/(TRAIL-1);
+      windPos.set([a.x,a.y,a.z,b.x,b.y,b.z],k*6); windCol.set([tmpCol.r*w,tmpCol.g*w,tmpCol.b*w,tmpCol.r*w,tmpCol.g*w,tmpCol.b*w],k*6); k++; } }
+  windGeo.attributes.position.needsUpdate=true; windGeo.attributes.color.needsUpdate=true; }
+(function loop(){ if(wind.visible) stepWind(); requestAnimationFrame(loop); })();
+
+async function loadWeather(){ if(wxLoading) return wxLoading;
+  wxLoading=fetch(WX+'weather.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{ if(!d) return;
+    const dec=b=>Uint8Array.from(atob(b),c=>c.charCodeAt(0));
+    WXD={w:d.w,h:d.h,valid:d.valid,cloud:dec(d.cloud),u:new Int8Array(dec(d.u).buffer),v:new Int8Array(dec(d.v).buffer)}; drawClouds(); windColours(); layerNote(); }).catch(()=>{}).finally(()=>{ wxLoading=null; });
+  return wxLoading; }
+
+// storms: a spinning marker with name and strength, path so far (solid), forecast (dashed), forecast cone and wind area
+const stormGroup=new THREE.Group(); stormGroup.visible=false; scene.add(stormGroup);
+const stormPast=new THREE.LineBasicMaterial({color:0xFFFFFF,transparent:true,opacity:.9}), stormFc=new THREE.LineDashedMaterial({color:0xFFFFFF,dashSize:.05,gapSize:.04,transparent:true,opacity:.9});
+const coneMat=new THREE.LineDashedMaterial({color:0xFFD08A,dashSize:.03,gapSize:.03,transparent:true,opacity:.7}), galeMat=new THREE.LineBasicMaterial({color:0xFFB15A,transparent:true,opacity:.75}), stormMat=new THREE.LineBasicMaterial({color:0xFF5A5A,transparent:true,opacity:.9});
+function arc(pts,r,closed){ const out=[]; // follow the globe between points
+  for(let i=0;i<pts.length;i++){ const a=pts[i], b=pts[(i+1)%pts.length]; if(!closed&&i===pts.length-1){ out.push(onSphere(a[1],a[0],r)); break; }
+    const pa=onSphere(a[1],a[0],1), pb=onSphere(b[1],b[0],1), n=Math.max(1,Math.ceil(pa.angleTo(pb)/(Math.PI/180)));
+    for(let k=0;k<n;k++) out.push(pa.clone().lerp(pb,k/n).normalize().multiplyScalar(r)); }
+  return out; }
+function line(pts,mat,r,closed){ if(!pts||pts.length<2) return; const g=new THREE.BufferGeometry().setFromPoints(arc(pts,r,closed)); const l=closed?new THREE.LineLoop(g,mat):new THREE.Line(g,mat); if(mat.isLineDashedMaterial) l.computeLineDistances(); stormGroup.add(l); }
+const stormTags=document.getElementById('stormTags');
+const hurricaneish=s=>/hurricane|typhoon|cyclone/i.test(s.now||'')&&!/storm|depression/i.test(s.now||'');
+function drawStorms(){ stormGroup.clear(); stormTags.innerHTML=''; if(!STORMS) return;
+  for(const st of STORMS.storms){ if(!st.at) continue;
+    line(st.cone,coneMat,R*1.0035,true); line(st.wind60,galeMat,R*1.0035,true); line(st.wind120,stormMat,R*1.0035,true);
+    line(st.past,stormPast,R*1.004,false); line(st.forecast,stormFc,R*1.004,false);
+    const tag=document.createElement('div'); tag.className='stormtag'+(hurricaneish(st)?'':' ts')+(st.at[1]<0?' south':''); tag.dataset.id=st.id;
+    tag.innerHTML='<i aria-hidden="true">🌀</i><span>'+esc(st.name)+'</span>'; tag.title=st.name+': '+st.now; tag.onclick=()=>flyToStorm(st);
+    tag.pos=onSphere(st.at[1],st.at[0],R*1.004); stormTags.appendChild(tag); }
+  stormList(); }
+function placeStormTags(){ if(!stormGroup.visible) return; const r=renderer.domElement.getBoundingClientRect(), cam=camera.position, d=cam.length();
+  for(const tag of stormTags.children){ const p=tag.pos, behind=p.clone().sub(cam).dot(p)>0||p.distanceTo(cam)>Math.sqrt(d*d-R*R)+.05; const v=p.clone().project(camera);
+    tag.style.display=behind||v.z>1?'none':'flex'; tag.style.left=((v.x+1)/2*r.width)+'px'; tag.style.top=((1-v.y)/2*r.height)+'px'; } }
+function flyToStorm(st){ flyTo(onSphere(st.at[1],st.at[0],1).normalize().multiplyScalar(R*2.2)); }
+const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
+function stormList(){ const box=document.getElementById('stormList'); if(!LAYERS.storms||!STORMS){ box.innerHTML=''; return; }
+  if(!STORMS.storms.length){ box.innerHTML='<div class="lnote">No tropical storms anywhere right now.</div>'; return; }
+  const when=t=>new Date(t).toLocaleString(undefined,{weekday:'short',hour:'2-digit',minute:'2-digit'});
+  box.innerHTML=STORMS.storms.map((st,i)=>{ const fc=(st.forecast||[]).filter(p=>p[3]&&Date.parse(p[3])>Date.now()).slice(0,4);
+    const CLS={TD:'Depression',TS:'Tropical storm',HU:cap(st.kind),TY:'Typhoon',STY:'Super typhoon'};
+    return '<button data-storm="'+i+'"><b>🌀 '+esc(st.name)+'</b> · '+esc(cap(st.now||''))+(st.countries&&st.countries.length?' · near '+esc(st.countries.slice(0,2).join(', ')):'')
+      +(st.peak&&st.peak!==st.now?'<small>Forecast to peak as a '+esc(st.peak)+' ('+st.peakKmh+' km/h winds)</small>':st.peakKmh?'<small>Winds up to '+st.peakKmh+' km/h</small>':'')
+      +(fc.length?'<span class="fc">'+fc.map(p=>'<span>'+when(p[3])+'</span><span>'+esc(CLS[p[2]]||p[2]||'')+'</span>').join('')+'</span>':'')+'</button>'; }).join('')
+    +'<div class="lnote">Solid line: where it has been. Dashed: forecast path, inside the dotted cone of uncertainty. Orange and red rings: areas with gale and storm-force winds now. Source: GDACS, updated '+ago(STORMS.updated)+'.</div>';
+  box.querySelectorAll('[data-storm]').forEach(b=>b.onclick=()=>flyToStorm(STORMS.storms[+b.dataset.storm])); }
+async function loadStorms(){ try{ const r=await fetch(WX+'storms.json',{cache:'no-store'}); if(r.ok){ STORMS=await r.json(); drawStorms(); layerNote(); } }catch(e){} }
+
+// the switches
+function layerNote(){ const n=document.getElementById('wxNote'), bits=[];
+  if((LAYERS.clouds||LAYERS.wind)&&WXD) bits.push((LAYERS.clouds?'Clouds':'')+(LAYERS.clouds&&LAYERS.wind?' and wind':LAYERS.wind?'Wind':'')+': NOAA forecast model for '+new Date(WXD.valid).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})+' ('+ago(WXD.valid)+')'+(LAYERS.wind?'. Brighter streaks are stronger winds.':'.'));
+  else if(LAYERS.clouds||LAYERS.wind) bits.push('Loading the weather…');
+  if(simOffset&&(LAYERS.clouds||LAYERS.wind||LAYERS.storms)) bits.push('Weather layers show now, not the time on the slider.');
+  n.textContent=bits.join(' ');
+  const on=['clouds','wind','storms','borders'].filter(k=>LAYERS[k]).length+(aurOn?1:0)+(LAYERS.night?1:0);
+  document.getElementById('layerSum').textContent='('+on+' on)'; }
+function layerButtons(){ document.querySelectorAll('#layers [data-layer]').forEach(b=>{ const k=b.dataset.layer, on=k==='aurora'?aurOn:!!LAYERS[k]; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); layerNote(); }
+function applyLayers(){ clouds.visible=LAYERS.clouds; wind.visible=LAYERS.wind; stormGroup.visible=LAYERS.storms; stormTags.style.display=LAYERS.storms?'':'none';
+  night.visible=LAYERS.night; if(borderLines) borderLines.visible=LAYERS.borders;
+  if((LAYERS.clouds||LAYERS.wind)&&!WXD) loadWeather(); if(LAYERS.storms&&!STORMS) loadStorms(); stormList(); layerButtons(); }
+document.querySelectorAll('#layers [data-layer]').forEach(b=>b.onclick=()=>{ const k=b.dataset.layer;
+  if(k==='aurora'){ aurBtn.click(); return; } LAYERS[k]=!LAYERS[k]; saveLayers(); applyLayers(); });
+windColours(); applyLayers();
+setInterval(()=>{ if(document.visibilityState!=='visible') return; if(LAYERS.clouds||LAYERS.wind){ WXD=null; loadWeather(); } if(LAYERS.storms) loadStorms(); },30*6e4);
 // ---------- sharper map: once the globe is up, swap in 50 km-detail land and draw the coastlines and country borders as
 // real lines (crisp at any zoom). Natural Earth data via world-atlas, public domain.
 function lineGeo(mesh,r){ const pos=[];
@@ -797,7 +931,7 @@ function lineGeo(mesh,r){ const pos=[];
 fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json').then(r=>r.ok?r.json():Promise.reject(r.status)).then(t=>{
   const rings=[]; for(const f of topojson.feature(t,t.objects.land).features){ const cs=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates; for(const p of cs) for(const ring of p) rings.push(ring); }
   LAND=rings; coastLines=true; const old=earth.material.map; earth.material.map=makeTexture(); earth.material.needsUpdate=true; if(old) old.dispose();
-  scene.add(new THREE.LineSegments(lineGeo(topojson.mesh(t,t.objects.countries,(a,b)=>a!==b),R*1.0005),borderMat));
+  borderLines=new THREE.LineSegments(lineGeo(topojson.mesh(t,t.objects.countries,(a,b)=>a!==b),R*1.0005),borderMat); borderLines.visible=LAYERS.borders; scene.add(borderLines);
   scene.add(new THREE.LineSegments(lineGeo(topojson.mesh(t,t.objects.land),R*1.0007),coastMat)); }).catch(()=>{});
 // ---------- "What's that light?": point your phone at a moving light and see which satellite it probably is ----------
 (function(){
