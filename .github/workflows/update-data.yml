@@ -42,6 +42,27 @@ jobs:
           [ "$(grep -c '^1 ' out/active.tle)" -gt 5000 ] || { echo "::error::active list looks truncated"; exit 1; }
           date -u +%Y-%m-%dT%H:%MZ > out/updated.txt
 
+      - name: Download crew data from Launch Library 2
+        # Who is on each space station, from The Space Devs (free tier: 15 requests/hour, we use 3 per run).
+        # Never fails the job: if the API is down or rate-limited, the previous copy is kept.
+        run: |
+          set -uo pipefail
+          LL=https://ll.thespacedevs.com/2.3.0
+          prev="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/data"
+          fetch() {  # name url
+            for attempt in 1 2 3; do
+              code=$(curl -sS -A "Overhead satellite tracker (github.com/${GITHUB_REPOSITORY})" -o "out/$1" -w '%{http_code}' "$2") || code=000
+              if [ "$code" = 200 ] && python3 -c "import json,sys;json.load(open(sys.argv[1]))" "out/$1"; then echo "$1: ok"; return 0; fi
+              echo "::warning::$1 attempt $attempt got HTTP $code"; sleep 30
+            done
+            rm -f "out/$1"
+            curl -sSf -o "out/$1" "$prev/$1" && echo "::warning::$1 kept previous copy" || echo "::warning::$1 unavailable"
+          }
+          fetch ll-stations.json   "$LL/space_stations/?mode=detailed&limit=20"
+          fetch ll-astronauts.json "$LL/astronauts/?in_space=true&mode=detailed&limit=100"
+          fetch ll-expeditions.json "$LL/expeditions/?mode=detailed&ordering=-start&limit=12"
+          true
+
       - name: Publish to the data branch
         run: |
           set -euo pipefail
