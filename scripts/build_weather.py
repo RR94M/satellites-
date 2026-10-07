@@ -274,6 +274,20 @@ def space_alerts(directory):
     print(f"space-alerts.json: {len(out)} alert(s) in 3 days: " + "; ".join(x["headline"][:60] for x in out[:5]))
 
 
+def volcanoes(directory):
+    """Volcanoes erupting or restless this week, from the Smithsonian/USGS Weekly Volcanic Activity Report."""
+    req = urllib.request.Request("https://volcano.si.edu/news/WeeklyVolcanoRSS.xml", headers=UA)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            raw = r.read().decode("utf-8", "replace")
+    except Exception as e:  # noqa: BLE001
+        print("::warning::no GVP weekly report:", e)
+        return
+    with open(f"{directory}/gvp-weekly.xml", "w", encoding="utf-8") as f:
+        f.write(raw)
+    print("gvp-weekly.xml:", len(raw), "bytes")
+
+
 if __name__ == "__main__":
     d = sys.argv[1]
     os.makedirs(d, exist_ok=True)
@@ -281,7 +295,7 @@ if __name__ == "__main__":
         gfs(d)
     except Exception as e:  # noqa: BLE001
         print("::warning::GFS step failed:", e)
-    for step in (storms, quakes, space_alerts):
+    for step in (storms, quakes, space_alerts, volcanoes):
         try:
             step(d)
         except Exception as e:  # noqa: BLE001 - one source failing shouldn't stop the others
