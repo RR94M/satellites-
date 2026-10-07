@@ -68,7 +68,11 @@ section h2{font-size:17px;font-weight:600;margin:0 0 2px}
 .pass .when{font-weight:600;font-size:16px}
 .pass .dir{color:var(--ink2);font-size:14px}
 .pass .acts{margin-top:6px}
-.pass .acts a{font-size:13px;display:inline-block;border:1px solid var(--line);border-radius:8px;padding:5px 10px;text-decoration:none;color:var(--ink)}
+.cal summary{font-size:13px;display:inline-block;border:1px solid var(--line);border-radius:8px;padding:5px 10px;color:var(--ink);cursor:pointer;list-style:none}
+.cal summary::-webkit-details-marker{display:none}
+.cal[open] summary{border-color:var(--accent)}
+.calmenu{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:6px}
+.calmenu a,.calmenu button{font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;text-decoration:none;color:var(--ink);background:var(--panel2)}
 .pass.now .when{color:var(--accent)}
 svg.chart{width:118px;height:118px;display:block}
 svg.chart .ring{fill:var(--sky);stroke:var(--skyline);stroke-width:1}
@@ -174,11 +178,25 @@ function chart(p){ const c=59,R=50, pt=([az,el])=>{ const r=R*(90-el)/90; return
     +'<circle class="ring" cx="59" cy="59" r="50"/><circle class="grid" cx="59" cy="59" r="33.3"/><circle class="grid" cx="59" cy="59" r="16.7"/>'
     +'<text x="59" y="7" text-anchor="middle">N</text><text x="114" y="62" text-anchor="end">E</text><text x="59" y="117" text-anchor="middle">S</text><text x="4" y="62">W</text>'
     +(pts.length>1?'<polyline class="path" points="'+pts.map(q=>q.join(',')).join(' ')+'"/>':'')+'<circle class="start" cx="'+s[0]+'" cy="'+s[1]+'" r="3.5"/></svg>'; }
+// "Add to calendar": a small menu, because no single method works everywhere. iPhone Safari blocks data: links,
+// in-app browsers (Instagram, Facebook) can't download files, and Android has no built-in .ics handler. So:
+// Google and Outlook open their own add-event pages; "Apple / other" downloads a proper .ics file (with a reminder).
 const icsStamp=t=>new Date(t).toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
-function calendarLink(title,p,detail){ const body=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Overhead//Tonight//EN','BEGIN:VEVENT','UID:'+p.start+'-'+title.replace(/\W/g,'')+'@overhead',
-    'DTSTAMP:'+icsStamp(Date.now()),'DTSTART:'+icsStamp(p.start-60e3),'DTEND:'+icsStamp(p.end+60e3),'SUMMARY:'+title+' (look '+compass(p.startAz)+')','DESCRIPTION:'+detail.replace(/[,;]/g,'\\$&'),
-    'BEGIN:VALARM','TRIGGER:-PT10M','ACTION:DISPLAY','DESCRIPTION:'+title+' in 10 minutes','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
-  return '<a href="data:text/calendar;charset=utf-8,'+encodeURIComponent(body)+'" download="'+title.toLowerCase().replace(/\W+/g,'-')+'.ics">Add to calendar</a>'; }
+const CAL=[]; // events behind the menus on screen, by index
+function icsFile(ev){ const txt=t=>t.replace(/\\/g,'\\\\').replace(/[,;]/g,'\\$&').replace(/\n/g,'\\n');
+  const fold=l=>{ let out='', n=0; for(const ch of l){ const w=new TextEncoder().encode(ch).length; if(n+w>73){ out+='\r\n '; n=1; } out+=ch; n+=w; } return out; }; // lines must stay under 75 bytes
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Overhead//Tonight//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT','UID:'+ev.start+'-'+ev.title.replace(/\W/g,'')+'@overhead',
+    'DTSTAMP:'+icsStamp(Date.now()),'DTSTART:'+icsStamp(ev.start),'DTEND:'+icsStamp(ev.end),'SUMMARY:'+txt(ev.title),'DESCRIPTION:'+txt(ev.detail),
+    'BEGIN:VALARM','TRIGGER:-PT10M','ACTION:DISPLAY','DESCRIPTION:'+txt(ev.title)+' in 10 minutes','END:VALARM','END:VEVENT','END:VCALENDAR'].map(fold).join('\r\n')+'\r\n'; }
+function calendarLink(title,p,detail){ const ev={title:title+' (look '+compass(p.startAz)+')',start:p.start-60e3,end:p.end+60e3,detail}, k=CAL.push(ev)-1, q=encodeURIComponent, iso=t=>new Date(t).toISOString().replace(/\.\d+/,'');
+  const google='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+q(ev.title)+'&dates='+icsStamp(ev.start)+'/'+icsStamp(ev.end)+'&details='+q(detail);
+  const outlook='https://outlook.live.com/calendar/0/deeplink/compose?path=%2Fcalendar%2Faction%2Fcompose&rru=addevent&subject='+q(ev.title)+'&startdt='+iso(ev.start)+'&enddt='+iso(ev.end)+'&body='+q(detail);
+  return '<details class="cal"><summary>Add to calendar</summary><div class="calmenu"><button type="button" data-ics="'+k+'">Apple Calendar or other (.ics file)</button>'
+    +'<a href="'+google+'" target="_blank" rel="noopener">Google Calendar</a><a href="'+outlook+'" target="_blank" rel="noopener">Outlook</a></div></details>'; }
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-ics]'); if(!b) return; const ev=CAL[+b.dataset.ics]; if(!ev) return;
+  const name=ev.title.toLowerCase().replace(/\W+/g,'-').replace(/^-|-$/g,'')+'.ics', blob=new Blob([icsFile(ev)],{type:'text/calendar;charset=utf-8'}), url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),120e3);
+  b.textContent='Downloaded: open '+name+' to add it'; });
 function passRow(what,p,extra){ const now=p.start<=Date.now();
   const dir='Appears in the '+compass(p.startAz)+', rises to '+Math.round(p.maxEl)+'° ('+height(p.maxEl)+'), disappears in the '+compass(p.endAz);
   return '<div class="pass'+(now?' now':'')+'"><div><div class="what">'+esc(what)+'</div><div class="when">'+(now?'Visible right now':whenLabel(p.start))+' · '+mins(p)+' min</div>'
@@ -194,7 +212,7 @@ const [stations,trains,kp]=await Promise.all([get('stations.tle','text'),get('tr
 const tle=(text,prefix)=>{ if(!text) return null; const L=text.split(/\r?\n/); for(let i=0;i<L.length-2;i++) if(L[i].startsWith(prefix)&&L[i+1].startsWith('1 ')) return satellite.twoline2satrec(L[i+1],L[i+2]); return null; };
 const STATIONS=[['the ISS',tle(stations,'ISS (ZARYA)')],['Tiangong',tle(stations,'CSS (TIANHE)')]].filter(x=>x[1]);
 
-function render(){ LT=loc?localTime(loc.lat,loc.lon):null; setWhere(); const out=[];
+function render(){ CAL.length=0; LT=loc?localTime(loc.lat,loc.lon):null; setWhere(); const out=[];
   if(!loc){ out.push('<section><h2>What you can see tonight</h2><p class="sub">Once you share your location: when the International Space Station and China’s Tiangong fly over, satellite trains, your chance of seeing the aurora, and when it gets dark.</p><button class="primary" id="locate2">Use my location</button></section>');
     $('content').innerHTML=out.join(''); $('locate2').onclick=locate; return; }
   const obs=observer(), now=Date.now(), [ws,we]=nightWindow(now), ev=darkness(obs,ws), m=moon(new Date(ev.dark||now));
@@ -242,7 +260,7 @@ function render(){ LT=loc?localTime(loc.lat,loc.lon):null; setWhere(); const out
   $('content').innerHTML=out.join(''); }
 
 if(!STATIONS.length) $('content').innerHTML='<section><p class="note">Couldn’t load the latest orbits. Check your connection and reload.</p></section>';
-else { render(); setInterval(()=>{ if(loc&&document.visibilityState==='visible') render(); },60e3); }
+else { render(); setInterval(()=>{ if(loc&&document.visibilityState==='visible'&&!document.querySelector('details.cal[open]')) render(); },60e3); }
 })();
 </script>
 </body>
