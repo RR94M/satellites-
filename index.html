@@ -108,6 +108,8 @@ button.on{border-color:var(--accent)}
 .note{color:var(--ink3);font-size:12px}
 .note a{color:var(--ink2)}
 #you{display:none;color:var(--you);font-size:13px}
+.tonight{display:block;border:1px solid var(--accent);border-radius:8px;padding:9px 12px;color:var(--ink);text-decoration:none;font-size:14px}
+.tonight span{color:var(--accent);float:right}
 @media (min-width:900px){
   #app{grid-template-rows:1fr;grid-template-columns:1fr 340px}
   #panel{border-top:0;border-left:1px solid var(--line);max-height:none;align-content:start;padding-top:14px}
@@ -135,6 +137,7 @@ button.on{border-color:var(--accent)}
     </div>
     <div id="results"></div>
     <div id="you"></div>
+    <a class="tonight" href="tonight.html">Tonight’s sky: ISS sightings, satellite trains, aurora chance <span aria-hidden="true">→</span></a>
     <div class="row"><span class="note">Owned by</span><select id="country"><option value="">Any country or organisation</option></select></div>
     <div class="chips" id="chips"></div>
     <div class="row">

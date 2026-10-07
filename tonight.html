@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tonight's sky - Overhead</title>
+<script>try{var p=localStorage.getItem('ovh:theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p}catch(e){document.documentElement.dataset.theme='dark'}</script>
+<meta name="description" content="What you can see in the sky tonight from where you are: the ISS and Tiangong, satellite trains, aurora chances, the Moon and when it gets dark.">
+<meta property="og:title" content="Tonight's sky - Overhead">
+<meta property="og:description" content="The ISS, satellite trains and aurora chances for where you are, tonight.">
+<meta property="og:type" content="website">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"></script>
+<style>
+/* Space Grotesk, self-hosted (SIL Open Font License, see fonts/OFL.txt) */
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/space-grotesk-latin-600-normal.woff2) format("woff2")}
+:root{
+  --bg:#0F1A2E; --panel:#1A2D4A; --panel2:#213858; --line:#2E4A72;
+  --ink:#EAF0F8; --ink2:#A9BAD2; --ink3:#7489A8;
+  --accent:#F2B340; --onaccent:#0F1A2E; --sky:#0B1B33; --skyline:#2E4A72;
+  --good:#7FE0C6; --maybe:#F2B340; --low:#A9BAD2; --aurora:#7FE0C6;
+}
+:root[data-theme="light"]{
+  --bg:#E8EEF6; --panel:#FFFFFF; --panel2:#F1F5FA; --line:#C9D5E5;
+  --ink:#13223A; --ink2:#3E5476; --ink3:#5A6E8C;
+  --accent:#B45309; --onaccent:#FFFFFF; --sky:#DCE6F2; --skyline:#9DB0C9;
+  --good:#0F766E; --maybe:#B45309; --low:#5A6E8C; --aurora:#0F766E;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;
+  padding:max(14px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+main{max-width:640px;margin:0 auto;display:grid;gap:14px}
+a{color:var(--ink2)}
+header{display:grid;gap:6px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.top a{font-size:14px;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink)}
+h1{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:4px 0 0}
+.where{color:var(--ink2);font-size:14px}
+.where button{margin-left:6px}
+button{font:inherit;font-size:14px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--onaccent);border-color:var(--accent);font-weight:500}
+button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration:underline;font-size:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+section h2{font-size:17px;font-weight:600;margin:0 0 2px}
+.sub{color:var(--ink3);font-size:13px;margin:0 0 10px}
+.note{color:var(--ink3);font-size:13px;margin:8px 0 0}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 14px}
+.facts div span{display:block;color:var(--ink3);font-size:12px}
+.facts div b{font-weight:500;font-size:16px}
+.pass{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding:12px 0 2px}
+.pass:first-of-type{border-top:0;padding-top:4px}
+.pass .what{font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em}
+.pass .when{font-weight:600;font-size:16px}
+.pass .dir{color:var(--ink2);font-size:14px}
+.pass .acts{margin-top:6px}
+.pass .acts a{font-size:13px;display:inline-block;border:1px solid var(--line);border-radius:8px;padding:5px 10px;text-decoration:none;color:var(--ink)}
+.pass.now .when{color:var(--accent)}
+svg.chart{width:118px;height:118px;display:block}
+svg.chart .ring{fill:var(--sky);stroke:var(--skyline);stroke-width:1}
+svg.chart .grid{fill:none;stroke:var(--skyline);stroke-width:.75;stroke-dasharray:2 3}
+svg.chart text{fill:var(--ink3);font-size:9px;font-family:inherit}
+svg.chart .path{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+svg.chart .start{fill:var(--accent)}
+.nights{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.night{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel2)}
+.night span{display:block;color:var(--ink3);font-size:12px}
+.night b{display:block;font-size:15px;font-weight:600}
+.night i{font-style:normal;font-size:13px}
+.good{color:var(--good)} .maybe{color:var(--maybe)} .low{color:var(--low)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 10px;font-size:13px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--onaccent);font-weight:500}
+footer{color:var(--ink3);font-size:12px;max-width:640px;margin:16px auto 0}
+.loading{color:var(--ink3)}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="top"><a href="./">← 3D globe</a>
+      <div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
+    <h1>Tonight's sky</h1>
+    <div class="where" id="where"></div>
+  </header>
+  <div id="content"><section><p class="loading">Loading the latest orbits…</p></section></div>
+</main>
+<footer>Orbits from <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>, aurora forecast from <a href="https://www.swpc.noaa.gov" target="_blank" rel="noopener">NOAA Space Weather Prediction Center</a>, refreshed every 6 hours. Sightings are worked out on your device; your location never leaves it.</footer>
+<script>
+(async function(){
+const DATA='https://raw.githubusercontent.com/rr94-ai/satellites-/data/';
+const $=id=>document.getElementById(id);
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const D2R=Math.PI/180;
+
+// ---------- theme (shared with the globe) ----------
+let themePref='auto'; try{ themePref=localStorage.getItem('ovh:theme')||'auto'; }catch(e){}
+const mq=matchMedia('(prefers-color-scheme: light)');
+function applyTheme(){ document.documentElement.dataset.theme=themePref==='auto'?(mq.matches?'light':'dark'):themePref;
+  document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===themePref)); }
+document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=b.dataset.t; try{ localStorage.setItem('ovh:theme',themePref); }catch(e){} applyTheme(); });
+mq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); }); applyTheme();
+
+// ---------- location: asked once, kept on this device ----------
+let loc=null; try{ loc=JSON.parse(localStorage.getItem('ovh:loc')||'null'); }catch(e){}
+function setWhere(){ const w=$('where');
+  if(!loc){ w.innerHTML='Share your location to see what passes over you. <button class="primary" id="locate">Use my location</button>'; $('locate').onclick=locate; return; }
+  w.innerHTML='Near '+Math.abs(loc.lat).toFixed(1)+'°'+(loc.lat>=0?'N':'S')+', '+Math.abs(loc.lon).toFixed(1)+'°'+(loc.lon>=0?'E':'W')+' · saved on this device only · <button class="link" id="relocate">Update</button> · <button class="link" id="forget">Forget</button>';
+  $('relocate').onclick=locate; $('forget').onclick=()=>{ try{ localStorage.removeItem('ovh:loc'); }catch(e){} loc=null; render(); }; }
+function locate(){ if(!navigator.geolocation){ $('where').textContent='Location is not available in this browser.'; return; }
+  $('where').textContent='Finding you…';
+  navigator.geolocation.getCurrentPosition(p=>{ loc={lat:+p.coords.latitude.toFixed(2),lon:+p.coords.longitude.toFixed(2)}; try{ localStorage.setItem('ovh:loc',JSON.stringify(loc)); }catch(e){} render(); },
+    ()=>{ $('where').innerHTML='Location was blocked. Allow it for this site in your browser settings, then <button class="link" id="retry">try again</button>.'; $('retry').onclick=locate; },{timeout:15000}); }
+
+// ---------- Sun, Moon, darkness ----------
+function sunEcf(d){ const j=d.getTime()/864e5-10957.5, L=(280.46+0.9856474*j)%360, g=(357.528+0.9856003*j)*D2R;
+  const lam=(L+1.915*Math.sin(g)+0.02*Math.sin(2*g))*D2R, eps=23.439*D2R;
+  const dec=Math.asin(Math.sin(eps)*Math.sin(lam)), ra=Math.atan2(Math.cos(eps)*Math.sin(lam),Math.cos(lam)), lon=ra-satellite.gstime(d);
+  return {x:Math.cos(dec)*Math.cos(lon),y:Math.cos(dec)*Math.sin(lon),z:Math.sin(dec)}; }
+function observer(){ const o={latitude:loc.lat*D2R,longitude:loc.lon*D2R,height:0}, e=satellite.geodeticToEcf(o), n=Math.hypot(e.x,e.y,e.z); return {geo:o,up:{x:e.x/n,y:e.y/n,z:e.z/n}}; }
+const sunAlt=(obs,d)=>{ const s=sunEcf(d); return Math.asin(obs.up.x*s.x+obs.up.y*s.y+obs.up.z*s.z)/D2R; };
+// "Tonight" runs from local noon to the next local noon, so after midnight it still means the night you're in.
+function nightWindow(base){ const n=new Date(base), s=new Date(n.getFullYear(),n.getMonth(),n.getDate(),12); if(n.getHours()<12) s.setDate(s.getDate()-1); return [s.getTime(),s.getTime()+864e5]; }
+function darkness(obs,start){ const ev={}; let prev=sunAlt(obs,new Date(start));
+  for(let t=start+6e4;t<=start+864e5;t+=6e4){ const a=sunAlt(obs,new Date(t));
+    if(prev>=-0.833&&a<-0.833&&!ev.sunset) ev.sunset=t; if(prev>=-12&&a<-12&&!ev.dark) ev.dark=t;
+    if(prev<-12&&a>=-12&&ev.dark&&!ev.darkEnd) ev.darkEnd=t; if(prev<-0.833&&a>=-0.833&&ev.sunset&&!ev.sunrise) ev.sunrise=t; prev=a; }
+  return ev; }
+function moon(d){ const age=(((d.getTime()/864e5+2440587.5-2451550.1)/29.530588853)%1+1)%1, lit=(1-Math.cos(2*Math.PI*age))/2;
+  const names=[[.03,'New Moon'],[.22,'Waxing crescent'],[.28,'First quarter'],[.47,'Waxing gibbous'],[.53,'Full Moon'],[.72,'Waning gibbous'],[.78,'Last quarter'],[.97,'Waning crescent'],[1.01,'New Moon']];
+  return {lit,name:names.find(x=>age<x[0])[1]}; }
+
+// ---------- sightings (same rules as the globe; checked against astropy) ----------
+const COMPASS=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const compass=az=>COMPASS[Math.round(((az/D2R)%360+360)%360/22.5)%16];
+function passes(rec,obs,from,to,max){ const out=[]; let cur=null;
+  for(let t=from;t<to;t+=30e3){ const d=new Date(t), pv=satellite.propagate(rec,d); if(!pv.position||typeof pv.position!=='object') continue;
+    const p=satellite.eciToEcf(pv.position,satellite.gstime(d)), la=satellite.ecfToLookAngles(obs.geo,p), el=la.elevation/D2R;
+    let vis=false;
+    if(el>=10&&sunAlt(obs,d)<-6){ const S=sunEcf(d), along=p.x*S.x+p.y*S.y+p.z*S.z, r2=p.x*p.x+p.y*p.y+p.z*p.z; vis=along>0||Math.sqrt(Math.max(0,r2-along*along))>6371; }
+    if(vis){ if(!cur) cur={start:t,end:t,startAz:la.azimuth,endAz:la.azimuth,maxEl:el,track:[]}; cur.end=t; cur.endAz=la.azimuth; cur.maxEl=Math.max(cur.maxEl,el); cur.track.push([la.azimuth,el]); }
+    else if(cur){ out.push(cur); cur=null; if(out.length>=max) break; } }
+  if(cur&&out.length<max) out.push(cur); return out; }
+
+// ---------- formatting ----------
+const fmtTime=t=>new Date(t).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+function whenLabel(t){ const d=new Date(t), n=new Date(), day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(), diff=Math.round((day(d)-day(n))/864e5), am=d.getHours()<12;
+  const name=diff===0?(am?'This morning':'Tonight'):diff===1?(am?'Tomorrow morning':'Tomorrow evening'):d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'});
+  return name+' '+fmtTime(t); }
+const height=e=>e>=60?'almost overhead':e>=30?'high in the sky':'low in the sky';
+const mins=p=>Math.max(1,Math.round((p.end-p.start+30e3)/6e4));
+function chart(p){ const c=59,R=50, pt=([az,el])=>{ const r=R*(90-el)/90; return [(c+r*Math.sin(az)).toFixed(1),(c-r*Math.cos(az)).toFixed(1)]; };
+  const pts=p.track.map(pt), s=pts[0];
+  return '<svg class="chart" viewBox="0 0 118 118" role="img" aria-label="Sky chart: appears in the '+compass(p.startAz)+', highest '+Math.round(p.maxEl)+' degrees, disappears in the '+compass(p.endAz)+'">'
+    +'<circle class="ring" cx="59" cy="59" r="50"/><circle class="grid" cx="59" cy="59" r="33.3"/><circle class="grid" cx="59" cy="59" r="16.7"/>'
+    +'<text x="59" y="7" text-anchor="middle">N</text><text x="114" y="62" text-anchor="end">E</text><text x="59" y="117" text-anchor="middle">S</text><text x="4" y="62">W</text>'
+    +(pts.length>1?'<polyline class="path" points="'+pts.map(q=>q.join(',')).join(' ')+'"/>':'')+'<circle class="start" cx="'+s[0]+'" cy="'+s[1]+'" r="3.5"/></svg>'; }
+const icsStamp=t=>new Date(t).toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+function calendarLink(title,p,detail){ const body=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Overhead//Tonight//EN','BEGIN:VEVENT','UID:'+p.start+'-'+title.replace(/\W/g,'')+'@overhead',
+    'DTSTAMP:'+icsStamp(Date.now()),'DTSTART:'+icsStamp(p.start-60e3),'DTEND:'+icsStamp(p.end+60e3),'SUMMARY:'+title+' (look '+compass(p.startAz)+')','DESCRIPTION:'+detail.replace(/[,;]/g,'\\$&'),
+    'BEGIN:VALARM','TRIGGER:-PT10M','ACTION:DISPLAY','DESCRIPTION:'+title+' in 10 minutes','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  return '<a href="data:text/calendar;charset=utf-8,'+encodeURIComponent(body)+'" download="'+title.toLowerCase().replace(/\W+/g,'-')+'.ics">Add to calendar</a>'; }
+function passRow(what,p,extra){ const now=p.start<=Date.now();
+  const dir='Appears in the '+compass(p.startAz)+', rises to '+Math.round(p.maxEl)+'° ('+height(p.maxEl)+'), disappears in the '+compass(p.endAz);
+  return '<div class="pass'+(now?' now':'')+'"><div><div class="what">'+esc(what)+'</div><div class="when">'+(now?'Visible right now':whenLabel(p.start))+' · '+mins(p)+' min</div>'
+    +'<div class="dir">'+dir+(extra?'. '+extra:'')+'</div><div class="acts">'+calendarLink('See '+what,p,dir+'. Look for a steady bright light moving faster than a plane.')+'</div></div>'+chart(p)+'</div>'; }
+
+// ---------- aurora ----------
+// Geomagnetic latitude (dipole pole 80.8N 72.7W) and the Kp at which aurora usually reaches your horizon
+// (the visibility line moves about 2 degrees of geomagnetic latitude towards the equator per Kp step).
+function magLat(lat,lon){ const p=80.8*D2R, l=-72.7*D2R, a=lat*D2R, b=lon*D2R; return Math.asin(Math.sin(a)*Math.sin(p)+Math.cos(a)*Math.cos(p)*Math.cos(b-l))/D2R; }
+function auroraVerdict(kp,need){ if(kp>=need+1) return ['good','Good chance']; if(kp>=need) return ['maybe','Possible, low on the horizon']; if(kp>=need-1) return ['low','Unlikely, worth a look if it’s clear']; return ['low','Very unlikely']; }
+
+// ---------- data ----------
+const get=(f,type)=>fetch(DATA+f).then(r=>r.ok?(type==='json'?r.json():r.text()):null).catch(()=>null);
+const [stations,trains,kp]=await Promise.all([get('stations.tle','text'),get('trains.json','json'),get('kp-forecast.json','json')]);
+const tle=(text,prefix)=>{ if(!text) return null; const L=text.split(/\r?\n/); for(let i=0;i<L.length-2;i++) if(L[i].startsWith(prefix)&&L[i+1].startsWith('1 ')) return satellite.twoline2satrec(L[i+1],L[i+2]); return null; };
+const STATIONS=[['the ISS',tle(stations,'ISS (ZARYA)')],['Tiangong',tle(stations,'CSS (TIANHE)')]].filter(x=>x[1]);
+
+function render(){ setWhere(); const out=[];
+  if(!loc){ out.push('<section><h2>What you can see tonight</h2><p class="sub">Once you share your location: when the International Space Station and China’s Tiangong fly over, satellite trains, your chance of seeing the aurora, and when it gets dark.</p><button class="primary" id="locate2">Use my location</button></section>');
+    $('content').innerHTML=out.join(''); $('locate2').onclick=locate; return; }
+  const obs=observer(), now=Date.now(), [ws,we]=nightWindow(now), ev=darkness(obs,ws), m=moon(new Date(ev.dark||now));
+
+  // darkness and Moon
+  const f=(k,v)=>'<div><span>'+k+'</span><b>'+v+'</b></div>';
+  out.push('<section><h2>When it gets dark</h2><p class="sub">'+new Date(ws).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})+' into '+new Date(we).toLocaleDateString(undefined,{weekday:'long'})+'</p><div class="facts">'
+    +f('Sunset',ev.sunset?fmtTime(ev.sunset):'No sunset')+f('Properly dark from',ev.dark?fmtTime(ev.dark):'Never fully dark')+f('Dark until',ev.darkEnd?fmtTime(ev.darkEnd):'–')+f('Sunrise',ev.sunrise?fmtTime(ev.sunrise):'–')
+    +f('Moon',esc(m.name))+f('Moon lit','about '+Math.round(m.lit*100)+'%')+'</div>'
+    +'<p class="note">'+(m.lit>0.75?'A bright Moon tonight washes out faint stars and aurora; satellites are still easy to see.':m.lit<0.25?'Little moonlight tonight: good for faint stars and aurora.':'Some moonlight tonight.')+' “Properly dark” is when the Sun is 12° below the horizon.</p></section>');
+
+  // space stations
+  const end=now+3*864e5; let rows=[];
+  for(const [name,rec] of STATIONS) for(const p of passes(rec,obs,now-5*6e4,end,6)) if(p.end>=now) rows.push([name==='the ISS'?'ISS':'Tiangong',p]);
+  rows.sort((a,b)=>a[1].start-b[1].start);
+  let st='<section><h2>Space stations</h2><p class="sub">The International Space Station and China’s Tiangong: steady, bright lights crossing the sky in a few minutes. Next 3 days.</p>';
+  if(rows.length) st+=rows.slice(0,6).map(([n,p])=>passRow(n,p)).join('');
+  else st+='<p class="note">No sightings from where you are in the next 3 days. Satellites can only be seen around dusk and dawn, when your sky is dark but they are still in sunlight.</p>';
+  if(!rows.some(r=>r[0]==='ISS')){ // the ISS has viewing "seasons": say when the next one starts
+    const iss=STATIONS.find(s=>s[0]==='the ISS'), nx=iss&&passes(iss[1],obs,end,now+28*864e5,1)[0];
+    st+=nx?passRow('ISS · next sighting',nx,'No ISS sightings for you before then'):'<p class="note">The ISS won’t be visible from where you are for at least 4 weeks.</p>'; }
+  out.push(st+'<p class="note">The sky charts show your sky as if looking down on a compass: north at the top, the dot is where it appears. Times can shift by a minute or so; check again on the day.</p></section>');
+
+  // satellite trains
+  let tr='<section><h2>Satellite trains</h2><p class="sub">Freshly launched Starlink, Kuiper and similar satellites travel in a tight line of lights for a few days after launch.</p>';
+  const list=(trains&&trains.trains)||[]; let found=0;
+  for(const t of list.slice(0,3)){ const rec=satellite.twoline2satrec(t.tle[0],t.tle[1]), per=2*Math.PI/rec.no, lineMin=Math.max(1,Math.round(t.length/360*per));
+    for(const p of passes(rec,obs,now-5*6e4,end,2)) if(p.end>=now){ found++; tr+=passRow(t.family+' train',p,t.count+' satellites launched as '+esc(t.designator)+', the line takes about '+lineMin+' min to pass'); } }
+  if(!found) tr+='<p class="note">'+(list.length?'There’s a fresh train in orbit, but it doesn’t pass over you in a dark sky in the next 3 days.':'No fresh satellite trains right now. They appear for a few days after each launch, and SpaceX launches several times a week, so check back.')+'</p>';
+  out.push(tr+'</section>');
+
+  // aurora
+  let au='<section><h2>Aurora</h2>';
+  const slots=Array.isArray(kp)?kp.map(x=>({t:Date.parse(x.time_tag+'Z'),kp:+x.kp,kind:x.observed})).filter(x=>isFinite(x.t)&&isFinite(x.kp)):[];
+  if(!slots.length) au+='<p class="note">The aurora forecast isn’t available right now.</p>';
+  else { const ml=magLat(loc.lat,loc.lon), need=Math.max(0,Math.min(9,(66.5-Math.abs(ml))/2.05)), side=loc.lat>=0?'northern':'southern';
+    au+='<p class="sub">Based on NOAA’s 3-day Kp forecast. '+(need>=8.5?'You’re a long way from the aurora zone: it only reaches your '+side+' horizon in extreme storms (Kp 9).':'Where you are, aurora usually needs Kp '+need.toFixed(1)+' or more to show on the '+side+' horizon.')+'</p><div class="nights">';
+    for(let k=0;k<3;k++){ const s0=ws+k*864e5, e=k===0?ev:darkness(obs,s0), a=e.dark||s0+6*36e5, b=e.darkEnd||s0+18*36e5;
+      const inNight=slots.filter(x=>x.t+3*36e5>a&&x.t<b); const top=inNight.length?Math.max(...inNight.map(x=>x.kp)):null;
+      const label=k===0?'Tonight':new Date(s0).toLocaleDateString(undefined,{weekday:'long'});
+      if(top===null){ au+='<div class="night"><span>'+label+'</span><b>–</b><i class="low">No forecast yet</i></div>'; continue; }
+      const [cls,txt]=auroraVerdict(top,need); au+='<div class="night"><span>'+label+'</span><b>Kp '+top.toFixed(1)+'</b><i class="'+cls+'">'+txt+'</i></div>'; }
+    au+='</div><p class="note">Kp measures how disturbed Earth’s magnetic field is, from 0 (calm) to 9 (major storm). Forecasts more than a day out are rough; look '+(loc.lat>=0?'north':'south')+', away from streetlights, and phone cameras often pick up aurora your eyes miss.</p>'; }
+  out.push(au+'</section>');
+  $('content').innerHTML=out.join(''); }
+
+if(!STATIONS.length) $('content').innerHTML='<section><p class="note">Couldn’t load the latest orbits. Check your connection and reload.</p></section>';
+else { render(); setInterval(()=>{ if(loc&&document.visibilityState==='visible') render(); },60e3); }
+})();
+</script>
+</body>
+</html>
