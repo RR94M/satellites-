@@ -141,6 +141,10 @@ button.primary{background:var(--accent);color:var(--onaccent);border-color:var(-
 .stormtag.south i{animation-direction:reverse}
 .stormtag span{background:rgba(160,30,30,.85);border-radius:6px;padding:1px 6px;text-shadow:none}
 .stormtag.ts span{background:rgba(180,110,20,.85)}
+.haztag span{background:rgba(20,30,50,.8);font-weight:500}
+.haztag i{animation:none;font-size:15px}
+.haztag .q{display:inline-block;border-radius:50%;background:rgba(255,90,90,.55);border:1.5px solid #FF6B6B;animation:none}
+.haztag.minor .q{background:rgba(255,177,90,.45);border-color:#FFB15A}
 @keyframes spin{to{transform:rotate(-360deg)}}
 @media (prefers-reduced-motion:reduce){.stormtag i{animation:none}}
 #label{position:absolute;pointer-events:none;color:var(--accent);font-size:13px;font-weight:500;transform:translate(10px,-8px);white-space:nowrap;text-shadow:0 1px 3px var(--halo),0 0 2px var(--halo)}
@@ -231,6 +235,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
   #app{grid-template-rows:1fr;grid-template-columns:1fr 340px}
   #panel{border-top:0;border-left:1px solid var(--line);max-height:none;align-content:start;padding-top:14px}
 }
+@media (max-width:420px){nav.pages .lg{display:none} nav.pages a{font-size:13px}}
 </style>
 </head>
 <body>
@@ -245,6 +250,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     <div class="clock"><span id="utc">--:--:--</span>UTC<em id="simLbl"></em></div>
     <div id="label"></div>
     <div id="stormTags"></div>
+    <div id="hazTags"></div>
     <div id="loading"><div><b>Loading the satellite catalogue</b><span id="loadmsg">Fetching orbital elements from CelesTrak...</span></div></div>
     <div class="hint">Drag to spin. Scroll or pinch to zoom. Tap a dot to follow it.</div>
     <button id="cmpBtn" aria-label="Compass: which way am I facing?" title="Compass"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4.5 L15 12 H9Z" fill="var(--accent)"/><path d="M12 19.5 L9 12 H15Z" fill="currentColor" opacity=".6"/></svg></button>
@@ -255,7 +261,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     <div class="viewbtns"><button id="reset">Reset view</button><button id="follow" style="display:none">Fly to it</button><button id="panelBtn" aria-controls="panel" aria-expanded="true">Hide menu</button></div>
   </div>
   <div id="panel">
-    <nav class="pages" aria-label="Pages"><a class="on" aria-current="page" href="./">Live globe</a><a href="tonight.html">Tonight’s sky</a><a href="launches.html">Launches</a></nav>
+    <nav class="pages" aria-label="Pages"><a class="on" aria-current="page" href="./">Live globe</a><a href="tonight.html">Tonight<span class="lg">’s sky</span></a><a href="launches.html">Launches</a><a href="alerts.html">Alerts</a></nav>
     <div class="row">
       <input id="q" type="search" placeholder="Find a satellite or astronaut (ISS, NASA, weather...)" autocomplete="off">
       <button id="locbtn">Use my location</button>
@@ -282,7 +288,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     </div>
     <div id="aur"><button id="aurBtn" class="on" aria-pressed="true"><i></i>Aurora</button><div id="aurTxt">Loading the aurora forecast…</div><div class="note" id="aurKey"></div></div>
     <details class="more" id="layers" open><summary>Layers <small id="layerSum"></small></summary><div class="morebody">
-      <div class="grp"><h4>Earth weather</h4><div class="tog"><button data-layer="clouds"><i>☁️</i>Clouds</button><button data-layer="wind"><i>💨</i>Wind</button><button data-layer="storms"><i>🌀</i>Storms</button></div><div class="lnote" id="wxNote"></div><div id="stormList"></div></div>
+      <div class="grp"><h4>Earth weather</h4><div class="tog"><button data-layer="clouds"><i>☁️</i>Clouds</button><button data-layer="wind"><i>💨</i>Wind</button><button data-layer="storms"><i>🌀</i>Storms</button><button data-layer="hazards"><i>⚠️</i>Quakes &amp; disasters</button></div><div class="lnote" id="wxNote"></div><div id="stormList"></div></div>
       <div class="grp"><h4>Space</h4><div class="tog"><button data-layer="aurora"><i>🟢</i>Aurora</button><button data-layer="night"><i>🌗</i>Day &amp; night</button></div></div>
       <div class="grp"><h4>Map</h4><div class="tog"><button data-layer="borders"><i>🗺️</i>Country borders</button></div></div>
     </div></details>
@@ -737,7 +743,8 @@ document.getElementById('share').onclick=function(){ const url=location.href, b=
   if(navigator.share) navigator.share({title:(sel?sel.name+' - ':'')+'Overhead',text:sel?'Follow '+sel.name+' live':'Every active satellite, live',url}).catch(()=>{});
   else if(navigator.clipboard) navigator.clipboard.writeText(url).then(()=>{ b.textContent='Link copied'; setTimeout(()=>b.textContent='Share',2000); }).catch(()=>{ prompt('Copy this link',url); });
   else prompt('Copy this link',url); };
-window.addEventListener('hashchange',()=>{ const z=fromLink(); if(z&&z!==sel){ select(z); followBtn.onclick(); } });
+function placeLink(hash){ const m=(hash||location.hash).match(/^#@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/); if(!m) return false; select(null); flyTo(onSphere(+m[1],+m[2],1).normalize().multiplyScalar(R*2.2)); return true; }
+window.addEventListener('hashchange',()=>{ if(placeLink()) return; const z=fromLink(); if(z&&z!==sel){ select(z); followBtn.onclick(); } });
 function fromLink(){ const id=(location.hash.match(/^#(\d{1,6})$/)||[])[1]; return id?sats.find(x=>x.m.id===id):null; }
 
 // location
@@ -818,7 +825,7 @@ setAurBtn(); loadAurora(); setInterval(loadAurora,10*60e3);
 // ---------- layers: clouds, wind and storms (Earth weather), aurora and day/night (space), borders (map) ----------
 // Clouds and wind: NOAA's GFS model on a 1-degree grid; storms: GDACS. Both copied hourly to the `weather` branch.
 const WX='https://raw.githubusercontent.com/RR94M/satellites-/weather/';
-let LAYERS={clouds:false,wind:false,storms:true,night:true,borders:true}; try{ Object.assign(LAYERS,JSON.parse(localStorage.getItem('ovh:layers')||'{}')); }catch(e){}
+let LAYERS={clouds:false,wind:false,storms:true,hazards:false,night:true,borders:true}; try{ Object.assign(LAYERS,JSON.parse(localStorage.getItem('ovh:layers')||'{}')); }catch(e){}
 let borderLines=null, WXD=null, wxLoading=null, STORMS=null;
 const saveLayers=()=>{ try{ localStorage.setItem('ovh:layers',JSON.stringify(LAYERS)); }catch(e){} };
 const ago=t=>{ const m=Math.round((Date.now()-Date.parse(t))/6e4); return m<60?m+' min ago':Math.round(m/60)+' h ago'; };
@@ -889,8 +896,9 @@ function drawStorms(){ stormGroup.clear(); stormTags.innerHTML=''; if(!STORMS) r
     tag.innerHTML='<i aria-hidden="true">🌀</i><span>'+esc(st.name)+'</span>'; tag.title=st.name+': '+st.now; tag.onclick=()=>flyToStorm(st);
     tag.pos=onSphere(st.at[1],st.at[0],R*1.004); stormTags.appendChild(tag); }
   stormList(); }
-function placeStormTags(){ if(!stormGroup.visible) return; const r=renderer.domElement.getBoundingClientRect(), cam=camera.position, d=cam.length();
-  for(const tag of stormTags.children){ const p=tag.pos, behind=p.clone().sub(cam).dot(p)>0||p.distanceTo(cam)>Math.sqrt(d*d-R*R)+.05; const v=p.clone().project(camera);
+function placeStormTags(){ const r=renderer.domElement.getBoundingClientRect(), cam=camera.position, d=cam.length();
+  const tags=[...(stormGroup.visible?stormTags.children:[]),...(LAYERS.hazards?hazTags.children:[])];
+  for(const tag of tags){ const p=tag.pos, behind=p.clone().sub(cam).dot(p)>0||p.distanceTo(cam)>Math.sqrt(d*d-R*R)+.05; const v=p.clone().project(camera);
     tag.style.display=behind||v.z>1?'none':'flex'; tag.style.left=((v.x+1)/2*r.width)+'px'; tag.style.top=((1-v.y)/2*r.height)+'px'; } }
 function flyToStorm(st){ flyTo(onSphere(st.at[1],st.at[0],1).normalize().multiplyScalar(R*2.2)); }
 const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
@@ -906,22 +914,35 @@ function stormList(){ const box=document.getElementById('stormList'); if(!LAYERS
   box.querySelectorAll('[data-storm]').forEach(b=>b.onclick=()=>flyToStorm(STORMS.storms[+b.dataset.storm])); }
 async function loadStorms(){ try{ const r=await fetch(WX+'storms.json',{cache:'no-store'}); if(r.ok){ STORMS=await r.json(); drawStorms(); layerNote(); } }catch(e){} }
 
+// quakes and disasters: USGS earthquakes (magnitude 5+ this week, or with an impact alert) and current GDACS floods,
+// wildfires, volcanoes and droughts (orange/red alerts, plus every volcano)
+const hazTags=document.getElementById('hazTags'); let HAZ=null;
+async function loadHazards(){ const [q,h]=await Promise.all([fetch(WX+'quakes.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null),fetch(WX+'hazards.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null)]);
+  HAZ={quakes:q?q.quakes:[],other:h?h.hazards:[]}; drawHazards(); }
+const HZICON={flood:'🌊',wildfire:'🔥',volcano:'🌋',drought:'🏜️'};
+function drawHazards(){ hazTags.innerHTML=''; if(!HAZ) return; const add=(lat,lon,html,title,cls,url)=>{ const t=document.createElement('div'); t.className='stormtag haztag'+(cls?' '+cls:''); t.innerHTML=html; t.title=title; t.pos=onSphere(lat,lon,R*1.004);
+    t.onclick=()=>{ flyTo(onSphere(lat,lon,1).normalize().multiplyScalar(R*2.2)); }; hazTags.appendChild(t); };
+  for(const q of HAZ.quakes){ if(q.lat==null||!(q.mag>=5||q.alert||q.tsunami)) continue; const px=Math.round(6+(q.mag-5)*6);
+    add(q.lat,q.lon,'<i class="q" style="width:'+px+'px;height:'+px+'px"></i><span>M'+q.mag.toFixed(1)+'</span>','Magnitude '+q.mag.toFixed(1)+' earthquake: '+q.place+' ('+new Date(q.time).toLocaleString()+')',q.mag<6?'minor':''); }
+  for(const h of HAZ.other){ if(h.lat==null||!(h.alert!=='Green'||h.type==='volcano')) continue;
+    add(h.lat,h.lon,'<i>'+(HZICON[h.type]||'⚠️')+'</i><span>'+esc((h.country||h.name||'').split(',')[0])+'</span>',h.name+(h.detail?': '+h.detail:'')+' ('+h.alert+' alert)'); } }
+
 // the switches
 function layerNote(){ const n=document.getElementById('wxNote'), bits=[];
   if((LAYERS.clouds||LAYERS.wind)&&WXD) bits.push((LAYERS.clouds?'Clouds':'')+(LAYERS.clouds&&LAYERS.wind?' and wind':LAYERS.wind?'Wind':'')+': NOAA forecast model for '+new Date(WXD.valid).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})+' ('+ago(WXD.valid)+')'+(LAYERS.wind?'. Brighter streaks are stronger winds.':'.'));
   else if(LAYERS.clouds||LAYERS.wind) bits.push('Loading the weather…');
   if(simOffset&&(LAYERS.clouds||LAYERS.wind||LAYERS.storms)) bits.push('Weather layers show now, not the time on the slider.');
   n.textContent=bits.join(' ');
-  const on=['clouds','wind','storms','borders'].filter(k=>LAYERS[k]).length+(aurOn?1:0)+(LAYERS.night?1:0);
+  const on=['clouds','wind','storms','hazards','borders'].filter(k=>LAYERS[k]).length+(aurOn?1:0)+(LAYERS.night?1:0);
   document.getElementById('layerSum').textContent='('+on+' on)'; }
 function layerButtons(){ document.querySelectorAll('#layers [data-layer]').forEach(b=>{ const k=b.dataset.layer, on=k==='aurora'?aurOn:!!LAYERS[k]; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }); layerNote(); }
 function applyLayers(){ clouds.visible=LAYERS.clouds; wind.visible=LAYERS.wind; stormGroup.visible=LAYERS.storms; stormTags.style.display=LAYERS.storms?'':'none';
-  night.visible=LAYERS.night; if(borderLines) borderLines.visible=LAYERS.borders;
+  night.visible=LAYERS.night; if(borderLines) borderLines.visible=LAYERS.borders; hazTags.style.display=LAYERS.hazards?'':'none'; if(LAYERS.hazards&&!HAZ) loadHazards();
   if((LAYERS.clouds||LAYERS.wind)&&!WXD) loadWeather(); if(LAYERS.storms&&!STORMS) loadStorms(); stormList(); layerButtons(); }
 document.querySelectorAll('#layers [data-layer]').forEach(b=>b.onclick=()=>{ const k=b.dataset.layer;
   if(k==='aurora'){ aurBtn.click(); return; } LAYERS[k]=!LAYERS[k]; saveLayers(); applyLayers(); });
 windColours(); applyLayers();
-setInterval(()=>{ if(document.visibilityState!=='visible') return; if(LAYERS.clouds||LAYERS.wind){ WXD=null; loadWeather(); } if(LAYERS.storms) loadStorms(); },30*6e4);
+setInterval(()=>{ if(document.visibilityState!=='visible') return; if(LAYERS.clouds||LAYERS.wind){ WXD=null; loadWeather(); } if(LAYERS.storms) loadStorms(); if(LAYERS.hazards) loadHazards(); },30*6e4);
 // ---------- sharper map: once the globe is up, swap in 50 km-detail land and draw the coastlines and country borders as
 // real lines (crisp at any zoom). Natural Earth data via world-atlas, public domain.
 function lineGeo(mesh,r){ const pos=[];
@@ -1019,7 +1040,9 @@ fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json').then(r=>r
   document.addEventListener('keydown',e=>{ if(open&&e.key==='Escape') close(); });
 })();
 { const l=WHERE.saved(); if(l) setMe(l,false); }
-resize(); const iss=fromLink()||sats.find(s=>s.name.startsWith('ISS (ZARYA)')); tick(true); if(iss){ select(iss); camera.position.set(iss.x,iss.y,iss.z).normalize().multiplyScalar(22); }
+const placeHash=/^#@/.test(location.hash)?location.hash:null; // read before selecting the ISS rewrites the address
+resize(); const iss=placeHash?null:fromLink()||sats.find(s=>s.name.startsWith('ISS (ZARYA)')); tick(true); if(iss){ select(iss); camera.position.set(iss.x,iss.y,iss.z).normalize().multiplyScalar(22); }
+if(placeHash){ if(!LAYERS.hazards&&!LAYERS.storms){ LAYERS.hazards=true; saveLayers(); applyLayers(); } placeLink(placeHash); }
 })();
 </script>
 </body>

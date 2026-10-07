@@ -135,12 +135,13 @@ nav.pages{display:flex;gap:4px;background:var(--panel);border:1px solid var(--li
 nav.pages a{flex:1;text-align:center;padding:7px 4px;border-radius:7px;text-decoration:none;color:var(--ink2);font-size:14px;white-space:nowrap;border:0}
 nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
 .top h1{margin:0}
+@media (max-width:420px){nav.pages .lg{display:none} nav.pages a{font-size:13px}}
 </style>
 </head>
 <body>
 <main>
   <header>
-    <nav class="pages" aria-label="Pages"><a href="./">Live globe</a><a href="tonight.html">Tonight’s sky</a><a href="launches.html" class="on" aria-current="page">Launches</a></nav>
+    <nav class="pages" aria-label="Pages"><a href="./">Live globe</a><a href="tonight.html">Tonight<span class="lg">’s sky</span></a><a href="launches.html" class="on" aria-current="page">Launches</a><a href="alerts.html">Alerts</a></nav>
     <div class="top"><h1>Launches</h1><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
     <p class="intro">Every rocket going up around the world: what it’s carrying, who’s on board, when, and where to watch it live. Tap a launch for the details.</p>
   </header>

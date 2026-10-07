@@ -15,6 +15,7 @@
 <script src="lib/aurora.js"></script>
 <script src="lib/where.js"></script>
 <script src="lib/calendar.js"></script>
+<script src="lib/sky.js"></script>
 <style>
 /* Space Grotesk, self-hosted (SIL Open Font License, see fonts/OFL.txt) */
 @font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
@@ -111,12 +112,13 @@ nav.pages{display:flex;gap:4px;background:var(--panel);border:1px solid var(--li
 nav.pages a{flex:1;text-align:center;padding:7px 4px;border-radius:7px;text-decoration:none;color:var(--ink2);font-size:14px;white-space:nowrap;border:0}
 nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
 .top h1{margin:0}
+@media (max-width:420px){nav.pages .lg{display:none} nav.pages a{font-size:13px}}
 </style>
 </head>
 <body>
 <main>
   <header>
-    <nav class="pages" aria-label="Pages"><a href="./">Live globe</a><a href="tonight.html" class="on" aria-current="page">Tonight’s sky</a><a href="launches.html">Launches</a></nav>
+    <nav class="pages" aria-label="Pages"><a href="./">Live globe</a><a href="tonight.html" class="on" aria-current="page">Tonight<span class="lg">’s sky</span></a><a href="launches.html">Launches</a><a href="alerts.html">Alerts</a></nav>
     <div class="top"><h1>Tonight's sky</h1><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
     <div class="where" id="where"></div>
   </header>
@@ -154,12 +156,7 @@ function locate(){ choosing=true; $('where').textContent='Finding you… (if you
   WHERE.locate().then(usePlace,e=>chooser(WHERE.help(e))); }
 
 // ---------- Sun, Moon, darkness ----------
-function sunEcf(d){ const j=d.getTime()/864e5-10957.5, L=(280.46+0.9856474*j)%360, g=(357.528+0.9856003*j)*D2R;
-  const lam=(L+1.915*Math.sin(g)+0.02*Math.sin(2*g))*D2R, eps=23.439*D2R;
-  const dec=Math.asin(Math.sin(eps)*Math.sin(lam)), ra=Math.atan2(Math.cos(eps)*Math.sin(lam),Math.cos(lam)), lon=ra-satellite.gstime(d);
-  return {x:Math.cos(dec)*Math.cos(lon),y:Math.cos(dec)*Math.sin(lon),z:Math.sin(dec)}; }
-function observer(){ const o={latitude:loc.lat*D2R,longitude:loc.lon*D2R,height:0}, e=satellite.geodeticToEcf(o), n=Math.hypot(e.x,e.y,e.z); return {geo:o,up:{x:e.x/n,y:e.y/n,z:e.z/n}}; }
-const sunAlt=(obs,d)=>{ const s=sunEcf(d); return Math.asin(obs.up.x*s.x+obs.up.y*s.y+obs.up.z*s.z)/D2R; };
+const {sunEcf,sunAlt,passes}=SKY; const observer=()=>SKY.observer(loc.lat,loc.lon); // lib/sky.js
 // "Tonight" runs from local noon to the next local noon (local to the saved location, not the phone),
 // so after midnight it still means the night you're in.
 let LT=null; // time-zone helpers for the saved location, set in render()
@@ -176,14 +173,6 @@ function moon(d){ const age=(((d.getTime()/864e5+2440587.5-2451550.1)/29.5305888
 // ---------- sightings (same rules as the globe; checked against astropy) ----------
 const COMPASS=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const compass=az=>COMPASS[Math.round(((az/D2R)%360+360)%360/22.5)%16];
-function passes(rec,obs,from,to,max){ const out=[]; let cur=null;
-  for(let t=from;t<to;t+=30e3){ const d=new Date(t), pv=satellite.propagate(rec,d); if(!pv.position||typeof pv.position!=='object') continue;
-    const p=satellite.eciToEcf(pv.position,satellite.gstime(d)), la=satellite.ecfToLookAngles(obs.geo,p), el=la.elevation/D2R;
-    let vis=false;
-    if(el>=10&&sunAlt(obs,d)<-6){ const S=sunEcf(d), along=p.x*S.x+p.y*S.y+p.z*S.z, r2=p.x*p.x+p.y*p.y+p.z*p.z; vis=along>0||Math.sqrt(Math.max(0,r2-along*along))>6371; }
-    if(vis){ if(!cur) cur={start:t,end:t,startAz:la.azimuth,endAz:la.azimuth,maxEl:el,track:[]}; cur.end=t; cur.endAz=la.azimuth; cur.maxEl=Math.max(cur.maxEl,el); cur.track.push([la.azimuth,el]); }
-    else if(cur){ out.push(cur); cur=null; if(out.length>=max) break; } }
-  if(cur&&out.length<max) out.push(cur); return out; }
 
 // ---------- formatting ----------
 // every time and date is shown in the saved location's own time zone

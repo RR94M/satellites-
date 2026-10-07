@@ -259,7 +259,13 @@ def space_alerts(directory):
         if "Potential Impacts:" in (a.get("message") or ""):
             k = next(i for i, l in enumerate(lines) if l.startswith("Potential Impacts:"))
             impacts = [l for l in [lines[k].split(":", 1)[1].strip()] + lines[k + 1:k + 6] if l and not l.startswith("www.")][:5]
-        out.append({"id": a.get("product_id"), "issued": issued.strftime("%Y-%m-%dT%H:%MZ"), "kind": head.split(":")[0].title(),
+        days = []  # watches list the expected level for each day, e.g. "Oct 08: G2 (Moderate)"
+        k = next((i for i, l in enumerate(lines) if l.lower().startswith("highest storm level predicted by day")), None)
+        if k is not None:
+            for l in lines[k + 1:k + 4]:
+                if not l: break
+                days.append(" ".join(l.split()))
+        out.append({"id": a.get("product_id"), "issued": issued.strftime("%Y-%m-%dT%H:%MZ"), "kind": head.split(":")[0].title(), "days": days,
                     "headline": head.split(":", 1)[1].strip(), "scale": field("NOAA Scale"), "validFrom": field("Valid From"),
                     "validTo": field("Valid To"), "impacts": impacts})
     out.sort(key=lambda x: x["issued"], reverse=True)

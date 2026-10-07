@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alerts - Overhead</title>
+<script>try{var p=localStorage.getItem('ovh:theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p}catch(e){document.documentElement.dataset.theme='dark'}</script>
+<meta name="description" content="What's happening now: things worth knowing where you are, storms, earthquakes and other disasters around the world, and space weather.">
+<meta property="og:title" content="Alerts - Overhead">
+<meta property="og:description" content="Storms, earthquakes, space weather and sky events, for you and around the world.">
+<meta property="og:type" content="website">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"></script>
+<script src="lib/tz-lookup.js"></script>
+<script src="lib/localtime.js"></script>
+<script src="lib/aurora.js"></script>
+<script src="lib/where.js"></script>
+<script src="lib/sky.js"></script>
+<style>
+/* Space Grotesk, self-hosted (SIL Open Font License, see fonts/OFL.txt) */
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/space-grotesk-latin-600-normal.woff2) format("woff2")}
+:root{
+  --bg:#0F1A2E; --panel:#1A2D4A; --panel2:#213858; --line:#2E4A72;
+  --ink:#EAF0F8; --ink2:#A9BAD2; --ink3:#7489A8;
+  --accent:#F2B340; --onaccent:#0F1A2E;
+  --red:#FF8A80; --orange:#FFB15A; --green:#7FE0C6; --info:#8CD1FF;
+}
+:root[data-theme="light"]{
+  --bg:#E8EEF6; --panel:#FFFFFF; --panel2:#F1F5FA; --line:#C9D5E5;
+  --ink:#13223A; --ink2:#3E5476; --ink3:#5A6E8C;
+  --accent:#B45309; --onaccent:#FFFFFF;
+  --red:#B42318; --orange:#B45309; --green:#0F766E; --info:#0369A1;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;
+  padding:max(14px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+main{max-width:680px;margin:0 auto;display:grid;gap:14px}
+a{color:var(--ink2)}
+header{display:grid;gap:6px}
+nav.pages{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+nav.pages a{flex:1;text-align:center;padding:7px 4px;border-radius:7px;text-decoration:none;color:var(--ink2);font-size:14px;white-space:nowrap}
+nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:0}
+.where{color:var(--ink2);font-size:14px}
+button{font:inherit;font-size:14px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--onaccent);border-color:var(--accent);font-weight:500}
+button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration:underline;font-size:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 10px;font-size:13px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--onaccent);font-weight:500}
+.placeform{display:flex;gap:6px;margin-top:8px;max-width:420px}
+.placeform input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;font-size:16px}
+.places{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:6px;max-width:420px}
+.places button{text-align:left;width:100%}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+section>h2{font-size:17px;font-weight:600;margin:0 0 2px}
+.sub{color:var(--ink3);font-size:13px;margin:0 0 10px}
+.note{color:var(--ink3);font-size:13px;margin:8px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.chips button{padding:5px 11px;border-radius:999px;font-size:13px;background:transparent;color:var(--ink2)}
+.chips button.on{border-color:var(--accent);color:var(--ink);background:var(--panel2)}
+.chips small{color:var(--ink3)}
+/* one alert */
+.al{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;border-top:1px solid var(--line);padding:11px 0}
+.al:first-of-type{border-top:0;padding-top:4px}
+.al .ic{font-size:22px;line-height:1.2;grid-row:span 4}
+.al b{font-weight:600;font-size:15px}
+.al .d{color:var(--ink2);font-size:14px}
+.al .m{color:var(--ink3);font-size:12px}
+.al .acts{display:flex;gap:10px;flex-wrap:wrap;font-size:13px;margin-top:2px}
+.lvl{display:inline-block;font-size:11px;font-weight:600;border:1px solid currentColor;border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:2px;white-space:nowrap}
+.lvl.red{color:var(--red)}.lvl.orange{color:var(--orange)}.lvl.green{color:var(--green)}.lvl.info{color:var(--info)}
+.more{margin-top:8px}
+.kp{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.kp b{font-size:26px;font-weight:600}
+footer{color:var(--ink3);font-size:12px;max-width:680px;margin:16px auto 0}
+@media (max-width:420px){nav.pages .lg{display:none} nav.pages a{font-size:13px}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <nav class="pages" aria-label="Pages"><a href="./">Live globe</a><a href="tonight.html">Tonight<span class="lg">’s sky</span></a><a href="launches.html">Launches</a><a href="alerts.html" class="on" aria-current="page">Alerts</a></nav>
+    <div class="top"><h1>Alerts</h1><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
+    <div class="where" id="where"></div>
+  </header>
+  <div id="content"><section><p class="note">Loading the latest alerts…</p></section></div>
+</main>
+<footer>Alerts are for interest and awareness, not official warnings: for your safety, follow your national weather service and civil protection. Sources: <a href="https://www.gdacs.org" target="_blank" rel="noopener">GDACS</a> (European Commission and UN) for storms and disasters, <a href="https://earthquake.usgs.gov" target="_blank" rel="noopener">USGS</a> for earthquakes, <a href="https://www.swpc.noaa.gov" target="_blank" rel="noopener">NOAA Space Weather Prediction Center</a> for space weather, and this site’s own sightings, aurora and launch data. Checked every hour. Your location stays on your device.</footer>
+<script>
+(async function(){
+const DATA='https://raw.githubusercontent.com/RR94M/satellites-/data/', WX='https://raw.githubusercontent.com/RR94M/satellites-/weather/', LAUNCH='https://raw.githubusercontent.com/RR94M/satellites-/launches/';
+const $=id=>document.getElementById(id);
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const D2R=Math.PI/180;
+
+// ---------- theme ----------
+let themePref='auto'; try{ themePref=localStorage.getItem('ovh:theme')||'auto'; }catch(e){}
+const mq=matchMedia('(prefers-color-scheme: light)');
+function applyTheme(){ document.documentElement.dataset.theme=themePref==='auto'?(mq.matches?'light':'dark'):themePref; document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===themePref)); }
+document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=b.dataset.t; try{ localStorage.setItem('ovh:theme',themePref); }catch(e){} applyTheme(); });
+mq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); }); applyTheme();
+
+// ---------- location (shared with the other pages) ----------
+let loc=WHERE.saved(), choosing=false, LT=loc?localTime(loc.lat,loc.lon):null;
+function setWhere(){ const w=$('where');
+  if(choosing) return;
+  if(!loc){ choosing=true; w.innerHTML='Share your location for alerts near you. <button class="primary" id="locate">Use my location</button> or type your town:<div id="placebox"></div>';
+    $('locate').onclick=locate; WHERE.picker($('placebox'),use); return; }
+  w.innerHTML='Near '+esc(WHERE.label(loc))+' · saved on this device only · <button class="link" id="chg">Change</button>';
+  $('chg').onclick=()=>{ loc=null; choosing=false; setWhere(); }; }
+function use(l){ loc=l; LT=localTime(l.lat,l.lon); choosing=false; setWhere(); render(); }
+function locate(){ $('where').textContent='Finding you… (if your phone asks, tap Allow)'; WHERE.locate().then(use,e=>{ choosing=false; loc=null; setWhere(); const p=document.createElement('p'); p.className='note'; p.textContent=WHERE.help(e); $('where').prepend(p); }); }
+
+// ---------- helpers ----------
+const ago=t=>{ const m=Math.round((Date.now()-t)/6e4); return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)===1?'1 day ago':Math.round(m/1440)+' days ago'; };
+const inT=t=>{ const m=Math.round((t-Date.now())/6e4); return m<60?'in '+m+' min':m<1440?'in '+Math.round(m/60)+' h':Math.round(m/1440)===1?'tomorrow':'in '+Math.round(m/1440)+' days'; };
+const fmt=(t,o)=>LT?(o==='time'?LT.time(t):LT.date(t,o)):new Date(t).toLocaleString(undefined,o==='time'?{hour:'2-digit',minute:'2-digit'}:o);
+const when=t=>fmt(t,{weekday:'short',day:'numeric',month:'short'})+' '+fmt(t,'time');
+function km(a,b,c,d){ const p=a*D2R,q=c*D2R,dl=(d-b)*D2R; return 6371*2*Math.asin(Math.sqrt(Math.sin((q-p)/2)**2+Math.cos(p)*Math.cos(q)*Math.sin(dl/2)**2)); }
+const near=x=>Math.round(x/10)*10;
+const WORD=['north','north-east','east','south-east','south','south-west','west','north-west'];
+function bearing(a,b,c,d){ const p=a*D2R,q=c*D2R,dl=(d-b)*D2R; const az=(Math.atan2(Math.sin(dl)*Math.cos(q),Math.cos(p)*Math.sin(q)-Math.sin(p)*Math.cos(q)*Math.cos(dl))/D2R+360)%360; return WORD[Math.round(az/45)%8]; }
+const LEVEL={Red:['red','Red alert'],Orange:['orange','Orange alert'],Green:['green','Green alert'],red:['red','Red alert'],orange:['orange','Orange alert'],yellow:['orange','Yellow alert'],green:['green','Green alert']};
+const lvl=k=>{ const v=LEVEL[k]; return v?'<span class="lvl '+v[0]+'">'+v[1]+'</span>':''; };
+const globe=(lat,lon)=>'<a href="./#@'+(+lat).toFixed(2)+','+(+lon).toFixed(2)+'">Show on globe</a>';
+function item(ic,title,detail,meta,acts){ return '<div class="al"><span class="ic" aria-hidden="true">'+ic+'</span><b>'+title+'</b>'+(detail?'<span class="d">'+detail+'</span>':'')+(meta?'<span class="m">'+meta+'</span>':'')+(acts?'<span class="acts">'+acts+'</span>':'')+'</div>'; }
+
+// ---------- data ----------
+const get=(u,type)=>fetch(u,{cache:'no-store'}).then(r=>r.ok?(type==='text'?r.text():r.json()):null).catch(()=>null);
+let D={};
+async function load(){ const [storms,quakes,haz,space,kp,launches,tle]=await Promise.all([get(WX+'storms.json'),get(WX+'quakes.json'),get(WX+'hazards.json'),get(WX+'space-alerts.json'),get(DATA+'kp-forecast.json'),get(LAUNCH+'launches.json'),get(DATA+'stations.tle','text')]);
+  D={storms,quakes,haz,space,kp,launches,tle}; }
+
+// ---------- 1. for you ----------
+function forYou(){ if(!loc) return '<section><h2>For you</h2><p class="sub">Share your location above to see what’s worth knowing where you are: sightings, aurora chances, launches you might see, and storms or earthquakes nearby.</p></section>';
+  const out=[]; const now=Date.now(); const L={lat:loc.lat,lon:loc.lon};
+  // sightings in the next 24 hours
+  if(D.tle&&window.satellite){ const lines=D.tle.split(/\r?\n/), rec=p=>{ for(let i=0;i<lines.length-2;i++) if(lines[i].startsWith(p)&&lines[i+1].startsWith('1 ')) return satellite.twoline2satrec(lines[i+1],lines[i+2]); return null; };
+    const obs=SKY.observer(L.lat,L.lon);
+    for(const [n,pref] of [['The ISS','ISS (ZARYA)'],['China’s Tiangong','CSS (TIANHE)']]){ const r=rec(pref); if(!r) continue; const p=SKY.passes(r,obs,now-2*6e4,now+864e5,1)[0]; if(!p) continue;
+      const dir=WORD[Math.round(((p.startAz/D2R)%360+360)%360/45)%8];
+      out.push({t:p.start,lvl:2,html:item('🛰️',n+' passes over you '+(p.start<=now?'right now':LT.when(p.start).replace(/^(Tonight|Tomorrow|This)/,w=>w.toLowerCase())),'Look '+dir+', rising to '+Math.round(p.maxEl)+'°, for about '+Math.max(1,Math.round((p.end-p.start)/6e4+.5))+' min. A steady bright light moving faster than a plane.','',''+'<a href="tonight.html">Sky chart and calendar reminder</a>')}); } }
+  // aurora in the next 24 hours
+  if(Array.isArray(D.kp)){ const need=AURORA.kpNeeded(L.lat,L.lon), slots=D.kp.map(x=>({t:Date.parse(x.time_tag+'Z'),kp:+x.kp})).filter(x=>x.t+3*36e5>now&&x.t<now+864e5), top=slots.reduce((m,x)=>!m||x.kp>m.kp?x:m,null);
+    if(top&&need<8.5&&top.kp>=need-.5) out.push({t:top.t,lvl:top.kp>=need+1?0:1,html:item('🟢','Aurora '+(top.kp>=need+1?'likely':top.kp>=need?'possible':'worth a look')+' '+(top.t<=now?'now':fmt(top.t,{weekday:'long'})+' night'),'Kp '+top.kp.toFixed(1)+' forecast; you usually need about Kp '+need.toFixed(1)+'. Look '+(L.lat>=0?'north':'south')+' from somewhere dark.','','<a href="tonight.html">Cloud and darkness tonight</a>')}); }
+  // launches
+  if(D.launches){ for(const l of D.launches.upcoming||[]){ const t=Date.parse(l.net), exact=['Second','Minute','Hour'].includes(l.precision); if(!exact||t<now-36e5) continue;
+      const crew=l.spacecraft&&l.spacecraft.crew&&l.spacecraft.crew.length, d=l.pad.lat!=null?km(L.lat,L.lon,l.pad.lat,l.pad.lon):1e9;
+      if(t<now+864e5||(crew&&t<now+7*864e5)||(d<1000&&t<now+7*864e5))
+        out.push({t,lvl:crew||d<1000?1:2,html:item('🚀',esc(l.name)+(crew?' ('+crew+' on board)':'')+' launches '+inT(t),esc(l.rocket)+' from '+esc(l.pad.location||'')+(d<1000?', '+near(d).toLocaleString()+' km '+bearing(L.lat,L.lon,l.pad.lat,l.pad.lon)+' of you: you might see it climb.':'.'),when(t),'<a href="launches.html#'+esc(l.slug)+'">Details and where to watch</a>')}); } }
+  // storms passing near you
+  if(D.storms){ for(const s of D.storms.storms){ if(!s.at) continue; let best=null;
+      for(const p of [[s.at[0],s.at[1],null]].concat((s.forecast||[]).map(p=>[p[0],p[1],p[3]?Date.parse(p[3]):null]))){ const d=km(L.lat,L.lon,p[1],p[0]); if(!best||d<best.d) best={d,t:p[2]}; }
+      if(best&&best.d<800) out.push({t:best.t||now,lvl:0,html:item('🌀',esc(s.name)+' '+(best.t?'is forecast to pass within '+near(best.d).toLocaleString()+' km of you on '+fmt(best.t,{weekday:'long'}):'is '+near(best.d).toLocaleString()+' km from you'),esc(cap(s.now||''))+(s.peak?' now; forecast to peak as a '+esc(s.peak):'')+'. Follow your local weather service’s warnings.','',globe(s.at[1],s.at[0]))}); } }
+  // earthquakes near you in the past 2 days
+  if(D.quakes){ for(const q of D.quakes.quakes){ if(q.time<now-2*864e5||q.lat==null) continue; const d=km(L.lat,L.lon,q.lat,q.lon);
+      if(d<1000||(q.mag>=6.5&&d<2500)) out.push({t:q.time,lvl:q.mag>=6?0:1,html:item('🌍','Magnitude '+q.mag.toFixed(1)+' earthquake '+near(d).toLocaleString()+' km from you',esc(q.place)+(q.tsunami?'. A tsunami message was issued; check official sources.':'.'),ago(q.time),globe(q.lat,q.lon)+' · <a href="'+esc(q.url)+'" target="_blank" rel="noopener">USGS details</a>')}); } }
+  // floods, fires and volcanoes nearby
+  if(D.haz){ for(const h of D.haz.hazards){ if(h.lat==null) continue; const d=km(L.lat,L.lon,h.lat,h.lon); if(d<(h.type==='volcano'?500:300))
+      out.push({t:Date.parse(h.to+'Z')||now,lvl:h.alert==='Red'?0:h.alert==='Orange'?1:2,html:item(ICON[h.type],esc(h.name)+', '+near(d).toLocaleString()+' km from you',esc(h.detail||''),'',globe(h.lat,h.lon))}); } }
+  out.sort((a,b)=>a.lvl-b.lvl||a.t-b.t);
+  return '<section><h2>For you</h2><p class="sub">What’s worth knowing near '+esc(WHERE.label(loc))+' in the next day or so.</p>'
+    +(out.length?out.map(x=>x.html).join(''):'<p class="note">Nothing near you right now. We check for sightings, aurora, launches, storms, earthquakes, floods, wildfires and volcanoes.</p>')+'</section>'; }
+
+// ---------- 2. around the world ----------
+const ICON={storm:'🌀',earthquake:'🌍',flood:'🌊',wildfire:'🔥',volcano:'🌋',drought:'🏜️'};
+let wfilter='all', showAll=false;
+function worldItems(){ const out=[]; const now=Date.now();
+  if(D.storms) for(const s of D.storms.storms) if(s.at) out.push({type:'storm',rank:{Red:0,Orange:1,Green:2}[s.alert]??2,t:now,html:item('🌀',esc(s.name)+lvl(s.alert),esc(cap(s.now||''))+(s.peak&&s.peak!==s.now?', forecast to peak as a '+esc(s.peak)+' ('+s.peakKmh+' km/h)':'')+(s.countries&&s.countries.length?' · near '+esc(s.countries.slice(0,2).join(', ')):''),'Updated '+ago(Date.parse(s.updated+'Z')),globe(s.at[1],s.at[0])+(s.report?' · <a href="'+esc(s.report)+'" target="_blank" rel="noopener">GDACS report</a>':''))});
+  if(D.quakes) for(const q of D.quakes.quakes){ if(q.lat==null) continue; const big=q.mag>=5.5||q.alert||q.tsunami; if(!big&&!(q.mag>=4.5&&q.time>now-864e5)) continue;
+    const level=q.alert||(q.mag>=7?'red':q.mag>=6?'orange':null);
+    out.push({type:'earthquake',rank:level==='red'?0:level==='orange'||level==='yellow'?1:2,t:q.time,html:item('🌍','Magnitude '+q.mag.toFixed(1)+' · '+esc(q.place)+lvl(level),'Depth '+Math.round(q.depth)+' km'+(q.tsunami?' · tsunami message issued':'')+(q.felt?' · felt by '+q.felt.toLocaleString()+' people':''),ago(q.time),globe(q.lat,q.lon)+' · <a href="'+esc(q.url)+'" target="_blank" rel="noopener">USGS details</a>')}); }
+  if(D.haz) for(const h of D.haz.hazards) out.push({type:h.type,rank:{Red:0,Orange:1,Green:2}[h.alert]??2,t:Date.parse((h.to||'')+'Z')||0,html:item(ICON[h.type]||'⚠️',esc(h.name)+lvl(h.alert),esc(h.detail||''),h.from?'Since '+fmt(Date.parse(h.from+'Z'),{day:'numeric',month:'short'}):'',h.lat!=null?globe(h.lat,h.lon)+(h.report?' · <a href="'+esc(h.report)+'" target="_blank" rel="noopener">GDACS report</a>':''):'')});
+  return out; }
+const cap=t=>t?t.charAt(0).toUpperCase()+t.slice(1):t;
+function world(){ const all=worldItems(), counts={}; all.forEach(x=>counts[x.type]=(counts[x.type]||0)+1);
+  let list=wfilter==='all'?all:all.filter(x=>x.type===wfilter); list.sort((a,b)=>a.rank-b.rank||b.t-a.t);
+  const LIMIT=12, shown=showAll?list:list.slice(0,LIMIT);
+  const chip=(k,label)=>'<button data-f="'+k+'"'+(wfilter===k?' class="on"':'')+'>'+label+(k==='all'?'':' <small>'+(counts[k]||0)+'</small>')+'</button>';
+  return '<section><h2>Around the world</h2><p class="sub">Storms, earthquakes and other disasters happening now, most serious first. Alert levels are GDACS’s and USGS’s estimates of the impact on people.</p>'
+    +'<div class="chips" id="wf">'+chip('all','All')+chip('storm','🌀 Storms')+chip('earthquake','🌍 Earthquakes')+chip('flood','🌊 Floods')+chip('wildfire','🔥 Wildfires')+chip('volcano','🌋 Volcanoes')+chip('drought','🏜️ Droughts')+'</div>'
+    +(shown.length?shown.map(x=>x.html).join(''):'<p class="note">Nothing of this kind right now.</p>')
+    +(list.length>LIMIT&&!showAll?'<button class="more" id="showAll">Show all '+list.length+'</button>':'')+'</section>'; }
+
+// ---------- 3. space weather ----------
+const PLAIN=[[/Geomagnetic Storm Category G(\d) Predicted/i,m=>'A '+['','minor','moderate','strong','severe','extreme'][+m[1]]+' geomagnetic storm (G'+m[1]+') is expected: aurora further from the poles than usual'],
+  [/Geomagnetic K-index of (\d)( expected)?/i,m=>(m[2]?'Expected: ':'')+'Earth’s magnetic field '+(+m[1]>=5?'is stormy':'is unsettled')+' (Kp '+m[1]+')'+(+m[1]>=5?', so aurora can reach lower latitudes':'')],
+  [/Geomagnetic Sudden Impulse/i,()=>'A burst of solar wind has just hit Earth’s magnetic field'],
+  [/X-ray Flux exceeded M(\d)|X-ray Event exceeded X/i,()=>'A strong solar flare: short radio blackouts are possible on the sunlit side of Earth'],
+  [/Proton Event/i,()=>'A solar radiation storm: higher radiation for astronauts and on polar flights'],
+  [/Electron 2MeV Integral Flux/i,()=>'High-energy electrons are building up around Earth: they can upset satellites (no effect on the ground)'],
+  [/Type II Radio Emission/i,()=>'A radio burst from the Sun, usually the sign of a big eruption heading out into space'],
+  [/Type IV Radio Emission/i,()=>'A long radio burst from the Sun, often linked to a major eruption'],
+  [/10cm Radio Burst/i,()=>'A burst of radio noise from the Sun, usually with a solar flare']];
+function plain(h){ for(const [re,f] of PLAIN){ const m=h.match(re); if(m) return f(m); } return h; }
+function space(){ let h='<section><h2>Space weather</h2><p class="sub">The Sun’s activity affects aurora, satellites, GPS and radio for the whole planet at once. From NOAA’s Space Weather Prediction Center.</p>';
+  if(Array.isArray(D.kp)){ const now=Date.now(), past=D.kp.map(x=>({t:Date.parse(x.time_tag+'Z'),kp:+x.kp,kind:x.observed})).filter(x=>x.t<=now&&isFinite(x.kp)), cur=past[past.length-1];
+    if(cur) h+='<div class="kp"><b>Kp '+cur.kp.toFixed(1)+'</b><span>'+AURORA.level(cur.kp)+' right now (0 is calm, 9 is a severe storm)</span></div>'; }
+  const alerts=(D.space&&D.space.alerts)||[], seen=new Set(), list=[];
+  for(const a of alerts){ const key=a.kind+a.headline; if(seen.has(key)) continue; seen.add(key); list.push(a); }
+  if(!list.length) h+='<p class="note">No space weather alerts in the past 3 days: a quiet spell.</p>';
+  h+=list.slice(0,8).map(a=>{ const s=(a.scale||'').match(/^([GRS])(\d)/), lv=s?(+s[2]>=3?'red':+s[2]>=2?'orange':'green'):null;
+    return item(a.kind==='Watch'?'👀':a.kind.includes('Warning')?'⚠️':'☀️',esc(plain(a.headline))+(lv?'<span class="lvl '+lv+'">'+esc(a.scale)+'</span>':''),
+      (a.days&&a.days.length?'Expected: '+esc(a.days.join(' · ')):'')+(a.impacts&&a.impacts.length?(a.days&&a.days.length?'<br>':'')+esc(a.impacts[0]):''),
+      esc(a.kind)+' issued '+ago(Date.parse(a.issued))+' · NOAA: “'+esc(a.headline)+'”',''); }).join('');
+  return h+'</section>'; }
+
+// ---------- page ----------
+function render(){ setWhere(); $('content').innerHTML=forYou()+world()+space();
+  document.querySelectorAll('#wf [data-f]').forEach(b=>b.onclick=()=>{ wfilter=b.dataset.f; showAll=false; render(); });
+  const sa=$('showAll'); if(sa) sa.onclick=()=>{ showAll=true; render(); }; }
+await load(); render();
+setInterval(async()=>{ if(document.visibilityState!=='visible') return; await load(); render(); },15*6e4);
+})();
+</script>
+</body>
+</html>
