@@ -131,14 +131,17 @@ svg.map text.n{font-weight:600;font-size:10px;fill:var(--ink2)}
 .calmenu a,.calmenu button{font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;text-decoration:none;color:var(--ink);background:var(--panel2)}
 .update{border-left:3px solid var(--accent);padding-left:10px;color:var(--ink2);font-size:14px}
 footer{color:var(--ink3);font-size:12px;max-width:680px;margin:16px auto 0}
+nav.pages{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+nav.pages a{flex:1;text-align:center;padding:7px 4px;border-radius:7px;text-decoration:none;color:var(--ink2);font-size:14px;white-space:nowrap;border:0}
+nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
+.top h1{margin:0}
 </style>
 </head>
 <body>
 <main>
   <header>
-    <div class="top"><nav><a href="./">← 3D globe</a><a href="tonight.html">Tonight</a></nav>
-      <div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
-    <h1>Launches</h1>
+    <nav class="pages" aria-label="Pages"><a href="./">Live globe</a><a href="tonight.html">Tonight’s sky</a><a href="launches.html" class="on" aria-current="page">Launches</a></nav>
+    <div class="top"><h1>Launches</h1><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
     <p class="intro">Every rocket going up around the world: what it’s carrying, who’s on board, when, and where to watch it live. Tap a launch for the details.</p>
   </header>
   <div class="filters"><div class="seg" id="filter" role="group" aria-label="Show"><button data-f="all" class="on">All</button><button data-f="crew">With people on board</button><button data-f="week">Next 7 days</button></div><span class="note" id="tz"></span></div>

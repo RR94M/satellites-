@@ -55,7 +55,7 @@ canvas{display:block;touch-action:none}
 .hud .sub b{color:var(--hud);font-weight:500}
 .clock{position:absolute;right:14px;top:12px;text-align:right;font-size:13px;color:var(--hud2);pointer-events:none;text-shadow:0 1px 3px var(--halo)}
 .clock span{display:block;color:var(--hud);font-size:17px;font-weight:500}
-.hint{position:absolute;left:14px;bottom:12px;font-size:12px;color:var(--hud3);pointer-events:none;text-shadow:0 1px 3px var(--halo)}
+.hint{position:absolute;left:14px;bottom:56px;font-size:12px;color:var(--hud3);pointer-events:none;text-shadow:0 1px 3px var(--halo)}
 .viewbtns{position:absolute;right:14px;bottom:12px;display:flex;gap:6px}
 /* compass: which way you're facing, from the phone's compass */
 #cmpBtn{position:absolute;right:14px;top:58px;width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center;background:var(--hudbtn);color:var(--hud);border-color:var(--line)}
@@ -93,12 +93,27 @@ button.on{border-color:var(--accent)}
 .chip.on{color:var(--ink);border-color:var(--sw)}
 .chip.on i{opacity:1}
 .chip small{color:var(--ink3)}
-#sel{display:none;border-top:1px solid var(--line);padding-top:10px}
+#sel{display:none;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
+.selhead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.selhead .x{background:none;border:0;color:var(--ink3);font-size:20px;line-height:1;padding:0 2px}
+nav.pages{display:flex;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}
+nav.pages a{flex:1;text-align:center;padding:7px 4px;border-radius:7px;text-decoration:none;color:var(--ink2);font-size:14px;white-space:nowrap}
+nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
+details.more>summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 0;list-style:none}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::before{content:'▸ ';color:var(--ink3)}
+details.more[open]>summary::before{content:'▾ '}
+details.more>summary small{color:var(--ink3);margin-left:4px}
+.morebody{display:grid;gap:10px;padding:4px 0 6px}
+#factsBox{margin-top:6px}
+#factsBox>summary{font-size:13px}
 #sel h2{margin:0 0 2px;font-size:17px;font-weight:600}
 #sel .tag{color:var(--ink2);font-size:13px;margin-bottom:8px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px 14px;font-size:14px}
 .stats div span{display:block;color:var(--ink3);font-size:12px}
 .stats div b{font-weight:500}
+.stats .wide{grid-column:1/-1}
+.stats b span{display:inline;color:inherit;font-size:inherit}
 .facts{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:14px}
 .facts span{color:var(--ink3);font-size:13px;padding-top:1px}
 .facts b{font-weight:500;overflow-wrap:anywhere}
@@ -110,7 +125,7 @@ button.on{border-color:var(--accent)}
 #passes .pass b{font-weight:600}
 #passes .dir{color:var(--ink2);font-size:13px}
 #passes button{margin-top:8px}
-#crew .who{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px;background:var(--panel2)}
+#crew .who{border-top:1px solid var(--line);padding:7px 0 2px;margin-top:6px}
 #crew .nm{font-weight:600}
 #crew .role{color:var(--ink3);font-size:12px;font-weight:400;margin-left:6px}
 #crew .ctry{font-size:13px;color:var(--ink2)}
@@ -137,8 +152,8 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
 .places button{text-align:left}
 .tonight{display:block;border:1px solid var(--accent);border-radius:8px;padding:9px 12px;color:var(--ink);text-decoration:none;font-size:14px}
 .tonight span{color:var(--accent);float:right}
-#aur{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--ink2)}
-#aur button{grid-row:span 2;padding:6px 10px}
+#aur{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--ink2)}
+#aur button{grid-row:span 2;padding:6px 10px;align-self:start}
 #aur button i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--aurora);margin-right:6px;vertical-align:0}
 #aur b{color:var(--ink)}
 #aur .note{grid-column:2}
@@ -165,6 +180,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     <div class="viewbtns"><button id="reset">Reset view</button><button id="follow" style="display:none">Fly to it</button></div>
   </div>
   <div id="panel">
+    <nav class="pages" aria-label="Pages"><a class="on" aria-current="page" href="./">Live globe</a><a href="tonight.html">Tonight’s sky</a><a href="launches.html">Launches</a></nav>
     <div class="row">
       <input id="q" type="search" placeholder="Find a satellite or astronaut (ISS, NASA, weather...)" autocomplete="off">
       <button id="locbtn">Use my location</button>
@@ -172,42 +188,43 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     <div id="results"></div>
     <div id="you"></div>
     <div id="placebox"></div>
+    <div id="sel">
+      <div class="selhead"><h2 id="sname"></h2><button class="x" id="clearX" aria-label="Stop following">×</button></div>
+      <div class="tag" id="stag"></div>
+      <div class="stats">
+        <div class="wide"><span>Right now it’s over</span><b><span id="slat"></span>, <span id="slon"></span></b></div>
+        <div><span>Altitude</span><b id="salt"></b></div>
+        <div><span>Speed</span><b id="sspd"></b></div>
+        <div><span>Orbit period</span><b id="sper"></b></div>
+        <div id="fromYou" style="display:none"><span>From you</span><b id="sel-el">-</b></div>
+        <div><span>Visible across</span><b id="sfp">-</b></div>
+      </div>
+      <div id="passes"></div>
+      <details class="more" id="factsBox"><summary>More about this satellite</summary><div class="facts" id="facts"></div></details>
+      <div id="crew"></div>
+      <div class="row"><button id="share">Share</button></div>
+    </div>
     <div id="aur"><button id="aurBtn" class="on" aria-pressed="true"><i></i>Aurora</button><div id="aurTxt">Loading the aurora forecast…</div><div class="note" id="aurKey"></div></div>
-    <a class="tonight" href="tonight.html">Tonight’s sky: ISS sightings, satellite trains, aurora chance <span aria-hidden="true">→</span></a>
-    <a class="tonight" href="launches.html">Launches: what’s going up next, who’s on board, where to watch <span aria-hidden="true">→</span></a>
-    <div class="row"><span class="note">Owned by</span><select id="country"><option value="">Any country or organisation</option></select></div>
+    <details class="more" id="filters"><summary>Filter what’s on the globe <small id="filterSum"></small></summary><div class="morebody">
     <div class="chips" id="chips"></div>
     <div class="row">
       <button id="allon">Show all</button>
       <button id="alloff">Hide all</button>
       <button id="horizon" style="display:none">Only above my horizon</button>
     </div>
+    <div class="row"><span class="note">Owned by</span><select id="country"><option value="">Any country or organisation</option></select></div>
     <div class="row">
-      <button id="fpAll">Footprints for all shown</button>
-      <span class="note">Visible when at least</span>
+      <button id="fpAll">Show coverage areas</button>
+      <span class="note">counting it as visible when at least</span>
       <select id="minEl"><option value="0">0° (horizon)</option><option value="10" selected>10°</option><option value="25">25°</option><option value="45">45°</option></select>
-      <span class="note">above the horizon</span>
+      <span class="note">up</span>
     </div>
-    <div class="row"><span class="note">Display</span><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
     <div class="note" id="fpNote"></div>
-    <div id="sel">
-      <h2 id="sname"></h2>
-      <div class="tag" id="stag"></div>
-      <div class="stats">
-        <div><span>Latitude</span><b id="slat"></b></div>
-        <div><span>Longitude</span><b id="slon"></b></div>
-        <div><span>Altitude</span><b id="salt"></b></div>
-        <div><span>Speed</span><b id="sspd"></b></div>
-        <div><span>Orbit period</span><b id="sper"></b></div>
-        <div><span>From you</span><b id="sel-el">-</b></div>
-        <div><span>Visible across</span><b id="sfp">-</b></div>
-      </div>
-      <div id="passes"></div>
-      <div class="facts" id="facts"></div>
-      <div id="crew"></div>
-      <div class="row"><button id="share">Share</button><button id="clear">Stop following</button></div>
-    </div>
+    </div></details>
+    <details class="more"><summary>Display and about</summary><div class="morebody">
+    <div class="row"><span class="note">Colours</span><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
     <div class="note">Satellite details come from the live <a href="https://celestrak.org/satcat/" target="_blank" rel="noopener">CelesTrak catalogue</a> and the <a href="https://www.ucs.org/resources/satellite-database" target="_blank" rel="noopener">UCS Satellite Database</a>. Positions are computed in your browser from orbital elements published by <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a> on <span id="epoch"></span>. The darker half of the globe is where it's night right now. The gold line is the followed satellite's path over the next 90 minutes, and the shaded circle is the area it can be seen from right now. Distances are to scale.</div>
+    </div></details>
   </div>
 </div>
 <script>
@@ -368,7 +385,7 @@ function describeAurora(){ const t=document.getElementById('aurTxt'), k=document
     h+=need>=8.5?'. Too far from the aurora zone for you to see it, except in the very biggest storms.':isFinite(kp)&&kp>=need?'. <b>It could be visible from where you are</b> if your sky is dark and clear: look '+(lat>=0?'north':'south')+'.':'. You need about Kp '+need.toFixed(1)+' to see it from where you are.'; }
   if(kpAhead&&kpAhead.kp>=(isFinite(kp)?kp+1:0)) h+=' Strongest in the next 3 days: Kp '+kpAhead.kp.toFixed(1)+', '+(me&&myTime?myTime.date(kpAhead.t,{weekday:'long'}):new Date(kpAhead.t).toLocaleDateString(undefined,{weekday:'long'}))+'.';
   t.innerHTML=h;
-  k.textContent=!aurOn?'':aurData.noMap?'NOAA’s live aurora map didn’t load, so only the dashed line is shown: the furthest from the pole it can be seen, low on the horizon, at the forecast Kp.':(strongest<5?'Very little aurora right now. ':'Green shows where it’s overhead now (brighter is more likely). ')+(isFinite(kp)?'Dashed line: the furthest from the pole it can be seen, low on the horizon, at this Kp. ':'')+'Source: NOAA, updated every few minutes.'; }
+  k.textContent=!aurOn?'':aurData.noMap?'Dashed line: how far from the pole it can be seen tonight.':(strongest<5?'Very little aurora right now.':'Green: aurora overhead now.')+(isFinite(kp)&&!aurData.noMap?' Dashed line: the furthest it can be seen, low on the horizon.':'')+' Source: NOAA.'; }
 async function getJSON(u,ms){ const c=new AbortController(), t=setTimeout(()=>c.abort(),ms);
   try{ const r=await fetch(u,{signal:c.signal,cache:'no-store'}); return r.ok?await r.json():null; }catch(e){ return null; }finally{ clearTimeout(t); } }
 async function loadAurora(){
@@ -400,7 +417,7 @@ const points=new THREE.Points(geo,mat); points.frustumCulled=false; points.rende
 const FAR=1e6;
 function refresh(){ // apply visibility by moving hidden points far away
   let shown=0; for(let i=0;i<N;i++){ const s=sats[i]; if(s.ok&&visible(s)){ pos[i*3]=s.x;pos[i*3+1]=s.y;pos[i*3+2]=s.z; shown++; } else { pos[i*3]=FAR;pos[i*3+1]=FAR;pos[i*3+2]=FAR; } }
-  geo.attributes.position.needsUpdate=true; document.getElementById('shown').textContent=shown.toLocaleString(); }
+  geo.attributes.position.needsUpdate=true; document.getElementById('shown').textContent=shown.toLocaleString(); const fs=document.getElementById('filterSum'); if(fs) fs.textContent=shown===N?'(showing all)':'(showing '+shown.toLocaleString()+' of '+N.toLocaleString()+')'; }
 
 // selection visuals
 const selMarker=new THREE.Mesh(new THREE.RingGeometry(.09,.12,32),new THREE.MeshBasicMaterial({color:0xF2B340,side:THREE.DoubleSide,depthTest:false})); selMarker.visible=false; selMarker.renderOrder=5; scene.add(selMarker);
@@ -478,15 +495,15 @@ function renderCrew(s){ const box=document.getElementById('crew'); const st=stat
   const now=Date.now(), n=st.crew.length;
   const people=st.crew.map(c=>{
     const ctry=c.countries.map(x=>flag(x.code)+esc(x.name)).join(', ')||'Nationality not listed';
-    const up=c.launched?new Date(c.launched):null, days=up?Math.max(0,Math.floor((now-up)/864e5)):null;
-    const arr=up?'<div class="ln"><span>Arrived:</span> launched '+fmtDate(c.launched)+(c.site?' from '+esc(c.site):'')+(c.mission?' on '+esc(c.mission):'')+(c.rocket?' ('+esc(c.rocket)+')':'')+' · '+days+' day'+(days===1?'':'s')+' in space</div>':'';
-    let dep='';
-    if(c.leaves){ const t=new Date(c.leaves), months=Math.round(c.typicalDays/30.4), ride=c.vehicle?' on '+esc(c.vehicle):'';
-      if(!c.leavesEstimated) dep=(t>now?'leaves '+fmtDate(c.leaves):'left '+fmtDate(c.leaves))+ride;
-      else if(t>now) dep='expected around '+t.toLocaleDateString(undefined,{month:'short',year:'numeric'})+ride+' <span class="est">(estimate: no date announced; stays usually last about '+(c.typicalDays<60?c.typicalDays+' days':months+' months')+')</span>';
-      else dep='expected soon'+ride+' <span class="est">(no date announced; already past the usual '+(c.typicalDays<60?c.typicalDays+'-day':months+'-month')+' stay)</span>'; }
+    const up=c.launched?new Date(c.launched):null, days=up?Math.max(0,Math.floor((now-up)/864e5)):null, site=(c.site||'').split(',')[0];
+    const how=up?'Launched '+fmtDate(c.launched)+(c.mission?' on '+esc(c.mission):'')+(site?' from '+esc(site):''):'';
+    let home='';
+    if(c.leaves){ const t=new Date(c.leaves);
+      if(!c.leavesEstimated) home=t>now?'leaves '+fmtDate(c.leaves):'left '+fmtDate(c.leaves);
+      else home=t>now?'home around '+t.toLocaleDateString(undefined,{month:'short',year:'numeric'})+' <span class="est">(estimate)</span>':'home soon <span class="est">(no date announced)</span>'; }
     return '<div class="who"><div class="nm">'+esc(c.name)+(c.role&&c.role!=='Crew'?'<span class="role">'+esc(c.role)+'</span>':'')+'</div>'
-      +'<div class="ctry">'+ctry+(c.agency?' · '+esc(c.agency):'')+'</div>'+arr+(dep?'<div class="ln"><span>Departure:</span> '+dep+'</div>':'')+'</div>'; }).join('');
+      +'<div class="ctry">'+ctry+(c.agency?' · '+esc(c.agency):'')+'</div>'
+      +(how||home?'<div class="ln">'+how+(days!=null?' · '+days+' day'+(days===1?'':'s')+' in space':'')+(home?' · '+home:'')+'</div>':'')+'</div>'; }).join('');
   box.innerHTML='<h3>On board now · '+n+' '+(n===1?'person':'people')+'</h3><div class="note">'+(st.expedition?esc(st.expedition)+' · ':'')+'crew data from <a href="https://thespacedevs.com/llapi" target="_blank" rel="noopener">The Space Devs</a>, updated '+fmtDate(CREW.updated)+'</div>'+people;
   box.style.display='block'; }
 function esc(t){ return String(t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
@@ -508,7 +525,7 @@ function renderFacts(s){ const m=s.m, rows=[]; if(!m.rec&&!m.recErr) loadRecord(
   if(m.type) add('Object type',esc(m.type));
   if(m.intl) add('Designation',esc(m.intl)+' / NORAD '+esc(m.id||''));
   if(m.comments) add('Notes',esc(m.comments));
-  let src=m.rec?'Catalogue data from CelesTrak SATCAT, fetched live.':m.recErr?'Could not reach the CelesTrak catalogue for this object.':'Fetching catalogue record...'; if(m.src==='ucs') src+=' Purpose and operator from the UCS Satellite Database (to May 2023).'; else if(m.src==='inferred') src+=' Purpose and operator inferred from the constellation name.'; else src+=D.metaDate?' No purpose or operator data is published for this object.':' Add meta.json to the site for purpose and operator details.';
+  let src=m.rec?'Catalogue data from CelesTrak SATCAT, fetched live.':m.recErr?'More details aren’t available right now.':'Fetching catalogue record...'; if(m.src==='ucs') src+=' Purpose and operator from the UCS Satellite Database (to May 2023).'; else if(m.src==='inferred') src+=' Purpose and operator inferred from the constellation name.'; else src+=D.metaDate?' No purpose or operator data is published for this object.':'';
   rows.push('<span></span><b style="color:var(--ink3);font-size:12px;font-weight:400">'+src+'</b>');
   document.getElementById('facts').innerHTML=rows.join(''); }
 function updateSel(){ if(!sel||!sel.ok) return; const f=(n,d)=>n.toFixed(d);
@@ -518,8 +535,8 @@ function updateSel(){ if(!sel||!sel.ok) return; const f=(n,d)=>n.toFixed(d);
   document.getElementById('sspd').textContent=sel.spd?f(sel.spd,2)+' km/s':'-';
   const per=2*Math.PI/sel.rec.no; document.getElementById('sper').textContent=per>=120?(per/60).toFixed(1)+' h':Math.round(per)+' min';
   const fa=footAngle(Math.hypot(sel.x,sel.y,sel.z)); document.getElementById('sfp').textContent=Math.round(2*fa*6371).toLocaleString()+' km wide';
-  document.getElementById('sel-el').textContent=me?(sel.el>0?Math.round(sel.el)+'° above horizon':'below horizon'):'-'; }
-document.getElementById('clear').onclick=()=>select(null);
+  document.getElementById('fromYou').style.display=me?'':'none'; document.getElementById('sel-el').textContent=me?(sel.el>0?Math.round(sel.el)+'° above horizon':'below horizon'):'-'; }
+document.getElementById('clearX').onclick=()=>select(null);
 // ---------- compass: which way you're facing, from the phone's own compass sensor ----------
 (function(){ const btn=document.getElementById('cmpBtn'), box=document.getElementById('cmp'), dial=document.getElementById('cmpDial'), dirEl=document.getElementById('cmpDir'), note=document.getElementById('cmpNote');
   let t=''; for(let a=0;a<360;a+=30) if(a%90) t+='<line class="tick" x1="0" y1="-60" x2="0" y2="-53" transform="rotate('+a+')"/>'; document.getElementById('cmpTicks').innerHTML=t;
