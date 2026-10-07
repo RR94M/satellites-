@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Overhead - every active satellite, live in 3D</title>
+<meta name="description" content="Every active satellite, live on a 3D globe. Follow the ISS, see who is on board, and find out when you can spot it from where you are.">
+<meta property="og:title" content="Overhead - every active satellite, live in 3D">
+<meta property="og:description" content="Follow the ISS, see who is on board, and find out when you can spot it from where you are.">
+<meta property="og:type" content="website">
 <script>try{var p=localStorage.getItem('ovh:theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p}catch(e){document.documentElement.dataset.theme='dark'}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -80,7 +84,13 @@ button.on{border-color:var(--accent)}
 .facts span{color:var(--ink3);font-size:13px;padding-top:1px}
 .facts b{font-weight:500;overflow-wrap:anywhere}
 #crew{display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
-#crew h3{margin:0;font-size:15px;font-weight:600}
+#crew h3,#passes h3{margin:0;font-size:15px;font-weight:600}
+#passes{display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+#passes .pass{border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-top:8px;background:var(--panel2);font-size:14px}
+#passes .pass.now{border-color:var(--accent)}
+#passes .pass b{font-weight:600}
+#passes .dir{color:var(--ink2);font-size:13px}
+#passes button{margin-top:8px}
 #crew .who{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px;background:var(--panel2)}
 #crew .nm{font-weight:600}
 #crew .role{color:var(--ink3);font-size:12px;font-weight:400;margin-left:6px}
@@ -152,9 +162,10 @@ button.on{border-color:var(--accent)}
         <div><span>From you</span><b id="sel-el">-</b></div>
         <div><span>Visible across</span><b id="sfp">-</b></div>
       </div>
+      <div id="passes"></div>
       <div class="facts" id="facts"></div>
       <div id="crew"></div>
-      <div class="row"><button id="clear">Stop following</button></div>
+      <div class="row"><button id="share">Share</button><button id="clear">Stop following</button></div>
     </div>
     <div class="note">Satellite details come from the live <a href="https://celestrak.org/satcat/" target="_blank" rel="noopener">CelesTrak catalogue</a> and the <a href="https://www.ucs.org/resources/satellite-database" target="_blank" rel="noopener">UCS Satellite Database</a>. Positions are computed in your browser from orbital elements published by <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a> on <span id="epoch"></span>. The darker half of the globe is where it's night right now. The gold line is the followed satellite's path over the next 90 minutes, and the shaded circle is the area it can be seen from right now. Distances are to scale.</div>
   </div>
@@ -372,7 +383,7 @@ new ResizeObserver(resize).observe(wrap); window.addEventListener('resize',resiz
 // selection
 const label=document.getElementById('label'), followBtn=document.getElementById('follow');
 function select(s){ sel=s; document.getElementById('sel').style.display=s?'block':'none'; followBtn.style.display=s?'inline-block':'none'; selMarker.visible=!!s; trackLine.visible=false; label.textContent=s?s.name:'';
-  if(s){ document.getElementById('sname').textContent=s.name; document.getElementById('stag').textContent=s.groups.length?s.groups.map(i=>G[i]).join(', '):'Catalogue object'; document.getElementById('q').value=''; results.style.display='none'; renderFacts(s); tick(true); groundTrack(s,new Date()); } renderCrew(s); updateFootprints(); }
+  if(s){ document.getElementById('sname').textContent=s.name; document.getElementById('stag').textContent=s.groups.length?s.groups.map(i=>G[i]).join(', '):'Catalogue object'; document.getElementById('q').value=''; results.style.display='none'; renderFacts(s); tick(true); groundTrack(s,new Date()); } renderCrew(s); renderPasses(s); setLink(s); updateFootprints(); }
 // "On board now" for space stations, from crew.json (Launch Library 2, refreshed every 6 hours)
 const flag=c=>c&&/^[A-Z]{2}$/.test(c)?String.fromCodePoint(...[...c].map(ch=>127397+ch.charCodeAt(0)))+' ':'';
 const fmtDate=t=>new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
@@ -450,14 +461,63 @@ q.addEventListener('input',()=>{ const v=q.value.trim().toUpperCase(); results.i
   if(!hits.length&&!aboard.length){ const d=document.createElement('div'); d.textContent='No satellite with that name in the catalogue'; results.appendChild(d); }
   results.style.display='block'; });
 
+// sightings: when a bright satellite is visible to the naked eye from where you are. That needs three things at
+// once: it is at least 10 degrees up, your sky is dark (Sun more than 6 degrees below your horizon), and the
+// satellite itself is still in sunlight (outside Earth's shadow). Checked every 30 seconds over the next 5 days.
+const passCache=new Map();
+function sunEcf(d){ const v=subsolarDir(d).normalize(); return {x:v.x,y:-v.z,z:v.y}; } // scene -> Earth-fixed unit vector (scene units are scaled, so normalise)
+const COMPASS=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const compass=az=>COMPASS[Math.round(((az*180/Math.PI)%360+360)%360/22.5)%16];
+function sightings(s){ if(!me) return [];
+  const key=s.name+'|'+Math.floor(Date.now()/6e5); if(passCache.has(key)) return passCache.get(key);
+  const o=satellite.geodeticToEcf(me), on=Math.hypot(o.x,o.y,o.z), up={x:o.x/on,y:o.y/on,z:o.z/on};
+  const out=[], step=30e3, t0=Date.now()-5*60e3, t1=t0+5*864e5; let cur=null;
+  for(let t=t0;t<t1;t+=step){ const d=new Date(t), pv=satellite.propagate(s.rec,d); if(!pv.position||typeof pv.position!=='object') continue;
+    const p=satellite.eciToEcf(pv.position,satellite.gstime(d)), la=satellite.ecfToLookAngles(me,p), el=la.elevation*180/Math.PI;
+    let vis=false;
+    if(el>=10){ const S=sunEcf(d); if(Math.asin(up.x*S.x+up.y*S.y+up.z*S.z)*180/Math.PI<-6){ const along=p.x*S.x+p.y*S.y+p.z*S.z, r2=p.x*p.x+p.y*p.y+p.z*p.z;
+      vis=along>0||Math.sqrt(Math.max(0,r2-along*along))>6371; } }
+    if(vis){ if(!cur) cur={start:t,end:t,startAz:la.azimuth,endAz:la.azimuth,maxEl:el}; else { cur.end=t; cur.endAz=la.azimuth; cur.maxEl=Math.max(cur.maxEl,el); } }
+    else if(cur){ out.push(cur); cur=null; if(out.length>=5) break; } }
+  if(cur&&out.length<5) out.push(cur);
+  passCache.set(key,out); return out; }
+function whenLabel(t){ const d=new Date(t), n=new Date(), day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=Math.round((day(d)-day(n))/864e5), am=d.getHours()<12, time=d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+  const name=diff===0?(am?'This morning':'Tonight'):diff===1?(am?'Tomorrow morning':'Tomorrow evening'):d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'});
+  return name+' '+time; }
+const height=e=>e>=60?'almost overhead':e>=30?'high in the sky':'low in the sky';
+function nextIssSighting(){ const s=sats.find(x=>x.name.startsWith('ISS (ZARYA)')); const p=s&&sightings(s).find(x=>x.end>=Date.now()); if(!p) return '';
+  return p.start<=Date.now()?'The ISS is visible right now: look '+compass(p.endAz)+'!':'Next time you can see the ISS: '+whenLabel(p.start).replace(/^T/,'t')+', look '+compass(p.startAz)+'.'; }
+function canSpot(s){ return s&&(s.groups.includes(0)||s.groups.includes(1)); } // stations and the "brightest objects" list
+function renderPasses(s){ const box=document.getElementById('passes'); if(!canSpot(s)){ box.style.display='none'; return; }
+  let h='<h3>See it from where you are</h3>';
+  if(!me) h+='<div class="note">'+esc(s.name)+' is bright enough to see with your own eyes. Share your location to find out when it passes over you.</div><button id="passLoc">Find sightings near me</button>';
+  else { const list=sightings(s).filter(p=>p.end>=Date.now());
+    if(!list.length) h+='<div class="note">No visible passes from your location in the next 5 days. Satellites can only be seen around dusk and dawn, when your sky is dark but they are still in sunlight.</div>';
+    else { h+=list.map(p=>{ const now=p.start<=Date.now(), mins=Math.max(1,Math.round((p.end-p.start+30e3)/60e3));
+        return '<div class="pass'+(now?' now':'')+'"><b>'+(now?'Visible right now':whenLabel(p.start))+'</b> · '+mins+' min'
+          +'<div class="dir">Appears in the '+compass(p.startAz)+', rises to '+Math.round(p.maxEl)+'° ('+height(p.maxEl)+'), disappears in the '+compass(p.endAz)+'</div></div>'; }).join('');
+      h+='<div class="note">Look for a steady bright light moving faster than a plane, with no flashing lights. Times are predicted from the latest orbit data and can shift by a minute or so; check again on the day.</div>'; } }
+  box.innerHTML=h; box.style.display='block'; const b=document.getElementById('passLoc'); if(b) b.onclick=requestLocation; }
+
+// share links: the address always points at what you are following (e.g. #25544 for the ISS)
+function setLink(s){ try{ history.replaceState(null,'',s?'#'+s.m.id:location.pathname+location.search); }catch(e){} }
+document.getElementById('share').onclick=function(){ const url=location.href, b=this;
+  if(navigator.share) navigator.share({title:(sel?sel.name+' - ':'')+'Overhead',text:sel?'Follow '+sel.name+' live':'Every active satellite, live',url}).catch(()=>{});
+  else if(navigator.clipboard) navigator.clipboard.writeText(url).then(()=>{ b.textContent='Link copied'; setTimeout(()=>b.textContent='Share',2000); }).catch(()=>{ prompt('Copy this link',url); });
+  else prompt('Copy this link',url); };
+window.addEventListener('hashchange',()=>{ const z=fromLink(); if(z&&z!==sel){ select(z); followBtn.onclick(); } });
+function fromLink(){ const id=(location.hash.match(/^#(\d{1,6})$/)||[])[1]; return id?sats.find(x=>x.m.id===id):null; }
+
 // location
 const you=document.getElementById('you'), hb=document.getElementById('horizon');
-document.getElementById('locbtn').onclick=()=>{ if(!navigator.geolocation){you.style.display='block';you.textContent='Location is not available in this browser.';return;}
+function requestLocation(){ if(!navigator.geolocation){you.style.display='block';you.textContent='Location is not available in this browser.';return;}
   you.style.display='block'; you.textContent='Finding you...';
   navigator.geolocation.getCurrentPosition(p=>{ me={latitude:p.coords.latitude*Math.PI/180,longitude:p.coords.longitude*Math.PI/180,height:(p.coords.altitude||0)/1000};
       const ecf=satellite.geodeticToEcf(me); const qv=toScene(ecf); youMarker.position.set(qv[0],qv[1],qv[2]); youRing.position.copy(youMarker.position); youRing.lookAt(0,0,0); youMarker.visible=youRing.visible=true;
-      hb.style.display='inline-block'; flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4)); tick(true); },
-   err=>{ you.textContent='Location was blocked, so the horizon filter is off. You can still track everything.'; },{timeout:10000}); };
+      hb.style.display='inline-block'; flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4)); passCache.clear(); tick(true); renderPasses(sel); },
+   err=>{ you.textContent='Location was blocked, so the horizon filter and sightings are off. You can still track everything.'; },{timeout:10000}); }
+document.getElementById('locbtn').onclick=requestLocation;
 hb.onclick=()=>{ horizonOnly=!horizonOnly; hb.classList.toggle('on',horizonOnly); refresh(); };
 
 // loop
@@ -465,7 +525,7 @@ let last=0, interval=1000;
 function tick(force){ const now=new Date(); document.getElementById('utc').textContent=now.toISOString().slice(11,19);
   if(force||now-last>=interval){ last=now; const t0=performance.now(); propagate(now); interval=(performance.now()-t0)>400?2000:1000; refresh(); updateSel(); updateFootprints();
     const sd=subsolarDir(now); sun.position.copy(sd).multiplyScalar(100); night.material.uniforms.sunDir.value.copy(sd).normalize();
-    if(me){ const above=sats.filter(s=>s.ok&&s.el>0).length; you.textContent=above.toLocaleString()+' satellites are above your horizon right now.'; }
+    if(me){ const above=sats.filter(s=>s.ok&&s.el>0).length; const nx=nextIssSighting(); you.textContent=above.toLocaleString()+' satellites are above your horizon right now.'+(nx?' '+nx:''); }
     if(sel&&now.getSeconds()===0) groundTrack(sel,now); }
   if(sel&&sel.ok){ selMarker.position.set(sel.x,sel.y,sel.z); selMarker.lookAt(camera.position); const sc=0.02*camera.position.distanceTo(selMarker.position); selMarker.scale.setScalar(sc*5);
     const v=selMarker.position.clone().project(camera); const r=renderer.domElement.getBoundingClientRect(); const behind=v.z>1||(selMarker.position.length()<camera.position.length()&&camera.position.distanceTo(selMarker.position)>Math.sqrt(camera.position.lengthSq()-R*R)+Math.sqrt(Math.max(0,selMarker.position.lengthSq()-R*R)));
@@ -486,7 +546,7 @@ function applyTheme(){ const name=themePref==='auto'?(darkMq.matches?'light':'da
 document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=b.dataset.t; try{ localStorage.setItem('ovh:theme',themePref); }catch(e){} applyTheme(); });
 darkMq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); });
 applyTheme();
-resize(); const iss=sats.find(s=>s.name.startsWith('ISS (ZARYA)')); tick(true); if(iss){ select(iss); camera.position.set(iss.x,iss.y,iss.z).normalize().multiplyScalar(22); }
+resize(); const iss=fromLink()||sats.find(s=>s.name.startsWith('ISS (ZARYA)')); tick(true); if(iss){ select(iss); camera.position.set(iss.x,iss.y,iss.z).normalize().multiplyScalar(22); }
 })();
 </script>
 </body>
