@@ -146,7 +146,7 @@ button.on{border-color:var(--accent)}
       <div class="facts" id="facts"></div>
       <div class="row"><button id="clear">Stop following</button></div>
     </div>
-    <div class="note">Satellite details come from the live <a href="https://celestrak.org/satcat/" target="_blank" rel="noopener">CelesTrak catalogue</a> and the <a href="https://www.ucs.org/resources/satellite-database" target="_blank" rel="noopener">UCS Satellite Database</a>. Positions are computed in your browser from orbital elements published by <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a> on <span id="epoch"></span>. The gold line is the followed satellite's path over the next 90 minutes, and the shaded circle is the area it can be seen from right now. Distances are to scale.</div>
+    <div class="note">Satellite details come from the live <a href="https://celestrak.org/satcat/" target="_blank" rel="noopener">CelesTrak catalogue</a> and the <a href="https://www.ucs.org/resources/satellite-database" target="_blank" rel="noopener">UCS Satellite Database</a>. Positions are computed in your browser from orbital elements published by <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a> on <span id="epoch"></span>. The darker half of the globe is where it's night right now. The gold line is the followed satellite's path over the next 90 minutes, and the shaded circle is the area it can be seen from right now. Distances are to scale.</div>
   </div>
 </div>
 <script>
@@ -249,9 +249,9 @@ controls.zoomSpeed=.8;
 // Earth texture drawn from embedded land polygons
 const THEMES={
   dark:{ocean:'#0B1B33',grid:'#1A3150',land:'#3A6496',coast:'#9CC0EA',clear:0x0F1A2E,atmo:0x8CD1FF,atmoOp:.08,stars:.5,ambient:.8,sun:.55,
-        sel:0xF2B340,fp:0xA9BAD2,you:0x7FE0C6,other:'#7489A8',outline:[0,0,0,0]},
+        sel:0xF2B340,fp:0xA9BAD2,you:0x7FE0C6,other:'#7489A8',outline:[0,0,0,0],night:[0.0,0.01,0.04,0.68]},
   light:{ocean:'#9CC2E8',grid:'#B4D1EE',land:'#F4EEDD',coast:'#4E6585',clear:0xDCE6F2,atmo:0x2F74C0,atmoOp:.12,stars:0,ambient:.95,sun:.3,
-        sel:0xB45309,fp:0x475569,you:0x0F766E,other:'#64748B',outline:[1,1,1,.95]}};
+        sel:0xB45309,fp:0x475569,you:0x0F766E,other:'#64748B',outline:[1,1,1,.95],night:[0.05,0.11,0.24,0.42]}};
 let TH=THEMES[document.documentElement.dataset.theme==='light'?'light':'dark'];
 function makeTexture(){ const w=4096,h=2048,c=document.createElement('canvas'); c.width=w;c.height=h; const g=c.getContext('2d');
   g.fillStyle=TH.ocean; g.fillRect(0,0,w,h);
@@ -272,6 +272,12 @@ const atmo=new THREE.Mesh(new THREE.SphereGeometry(R*1.02,64,48),new THREE.MeshB
 const amb=new THREE.AmbientLight(0xffffff,.5); scene.add(amb);
 const sun=new THREE.DirectionalLight(0xfff4e0,1.05); scene.add(sun);
 // stars
+// day / night: a shell just above the surface, dark where the Sun is down, with a soft twilight edge
+const night=new THREE.Mesh(new THREE.SphereGeometry(R*1.0015,96,64),new THREE.ShaderMaterial({transparent:true,depthWrite:false,
+  uniforms:{sunDir:{value:new THREE.Vector3(1,0,0)},tint:{value:new THREE.Vector4(0,0,0,.6)}},
+  vertexShader:'varying vec3 vN; void main(){ vN=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader:'uniform vec3 sunDir; uniform vec4 tint; varying vec3 vN; void main(){ float s=dot(normalize(vN),sunDir); float a=tint.a*smoothstep(0.02,-0.21,s); gl_FragColor=vec4(tint.rgb,a); }'}));
+night.renderOrder=1; scene.add(night);
 const starMat=new THREE.PointsMaterial({color:0x9DB4D1,size:.5,sizeAttenuation:false,transparent:true,opacity:.5});
 (function(){ const n=1500,p=new Float32Array(n*3); for(let i=0;i<n;i++){ const u=Math.random()*2-1,th=Math.random()*6.2832,rr=Math.sqrt(1-u*u); const v=new THREE.Vector3(rr*Math.cos(th),u,rr*Math.sin(th)).multiplyScalar(300); p.set([v.x,v.y,v.z],i*3);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3)); scene.add(new THREE.Points(g,starMat)); })();
 
@@ -283,7 +289,7 @@ const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,
   uniforms:{dpr:{value:renderer.getPixelRatio()},outline:{value:new THREE.Vector4(0,0,0,0)}},
   vertexShader:'attribute float psize; attribute vec3 color; varying vec3 vC; uniform float dpr; void main(){ vC=color; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_Position=projectionMatrix*mv; gl_PointSize=psize*dpr*clamp(40.0/-mv.z,0.5,1.8); }',
   fragmentShader:'uniform vec4 outline; varying vec3 vC; void main(){ float d=length(gl_PointCoord-0.5); if(d>0.5) discard; vec3 c=mix(vC,outline.rgb,outline.a*smoothstep(0.30,0.36,d)); gl_FragColor=vec4(c,1.0-smoothstep(mix(0.3,0.44,outline.a),0.5,d)); }'});
-const points=new THREE.Points(geo,mat); points.frustumCulled=false; scene.add(points);
+const points=new THREE.Points(geo,mat); points.frustumCulled=false; points.renderOrder=2; scene.add(points); // drawn after the night shade so dots never dim
 const FAR=1e6;
 function refresh(){ // apply visibility by moving hidden points far away
   let shown=0; for(let i=0;i<N;i++){ const s=sats[i]; if(s.ok&&visible(s)){ pos[i*3]=s.x;pos[i*3+1]=s.y;pos[i*3+2]=s.z; shown++; } else { pos[i*3]=FAR;pos[i*3+1]=FAR;pos[i*3+2]=FAR; } }
@@ -425,7 +431,7 @@ hb.onclick=()=>{ horizonOnly=!horizonOnly; hb.classList.toggle('on',horizonOnly)
 let last=0, interval=1000;
 function tick(force){ const now=new Date(); document.getElementById('utc').textContent=now.toISOString().slice(11,19);
   if(force||now-last>=interval){ last=now; const t0=performance.now(); propagate(now); interval=(performance.now()-t0)>400?2000:1000; refresh(); updateSel(); updateFootprints();
-    sun.position.copy(subsolarDir(now).multiplyScalar(100));
+    const sd=subsolarDir(now); sun.position.copy(sd).multiplyScalar(100); night.material.uniforms.sunDir.value.copy(sd).normalize();
     if(me){ const above=sats.filter(s=>s.ok&&s.el>0).length; you.textContent=above.toLocaleString()+' satellites are above your horizon right now.'; }
     if(sel&&now.getSeconds()===0) groundTrack(sel,now); }
   if(sel&&sel.ok){ selMarker.position.set(sel.x,sel.y,sel.z); selMarker.lookAt(camera.position); const sc=0.02*camera.position.distanceTo(selMarker.position); selMarker.scale.setScalar(sc*5);
@@ -440,7 +446,7 @@ function applyTheme(){ const name=themePref==='auto'?(darkMq.matches?'light':'da
   if(earth.userData.theme!==name){ const old=earth.material.map; earth.material.map=makeTexture(); earth.material.needsUpdate=true; if(old) old.dispose(); earth.userData.theme=name; }
   renderer.setClearColor(TH.clear); atmo.material.color.setHex(TH.atmo); atmo.material.opacity=TH.atmoOp; starMat.opacity=TH.stars; amb.intensity=TH.ambient; sun.intensity=TH.sun;
   for(const m of [selMarker,trackLine,fpSel,cone,disc]) m.material.color.setHex(TH.sel); fpAll.material.color.setHex(TH.fp); youMarker.material.color.setHex(TH.you); youRing.material.color.setHex(TH.you);
-  mat.uniforms.outline.value.set(...TH.outline);
+  mat.uniforms.outline.value.set(...TH.outline); night.material.uniforms.tint.value.set(...TH.night);
   const cs=getComputedStyle(document.documentElement); cols=G.map((_,i)=>cs.getPropertyValue('--c'+i).trim());
   sats.forEach((s,i)=>{ const gi=s.groups.length?s.groups[0]:-1; const c=new THREE.Color(gi>=0?cols[gi]:TH.other); col.set([c.r,c.g,c.b],i*3); }); geo.attributes.color.needsUpdate=true;
   document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===themePref)); }
