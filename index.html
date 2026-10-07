@@ -718,7 +718,7 @@ function youLabel(){ const l=WHERE.saved(); if(!me||!myTime){ youTimeEl.classLis
   document.getElementById('youPlace').textContent='📍 '+place; document.getElementById('youZone').textContent=myTime.abbr; youTimeEl.classList.add('on'); youClock(simNow()); }
 let lastSec=-1;
 function youClock(now){ if(!myTime) return; const sec=Math.floor(now/1e3); if(sec===lastSec) return; lastSec=sec;
-  youClockEl.textContent=now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:myTime.zone}); }
+  youClockEl.textContent=now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:myTime.zone}); document.getElementById('youZone').textContent=myTime.abbrAt(now); }
 function flyHome(){ if(!me) return; flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4)); }
 document.getElementById('youBtn').onclick=()=>{ if(me) flyHome(); else requestLocation(); };
 youTimeEl.onclick=flyHome;

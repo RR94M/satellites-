@@ -164,7 +164,9 @@ document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=
 mq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); }); applyTheme();
 
 // ---------- times: in your phone's time zone, with the launch site's own clock alongside ----------
-const zoneName=(()=>{ try{ return new Intl.DateTimeFormat(undefined,{timeZoneName:'short'}).formatToParts(new Date()).find(p=>p.type==='timeZoneName').value; }catch(e){ return ''; } })();
+// short name of your time zone ("BST", "EDT"): it only appears in that country's English, so try a few (see lib/localtime.js)
+const zoneName=(()=>{ let fb=''; for(const l of [...((navigator.language||'').toLowerCase().startsWith('en')?[navigator.language]:[]),'en-GB','en-US','en-AU','en-IN','en-IE','en-ZA','en-NZ','en-CA']){
+  try{ const v=new Intl.DateTimeFormat(l,{timeZoneName:'short'}).formatToParts(new Date()).find(p=>p.type==='timeZoneName').value; if(/^[A-Z]{2,5}$/.test(v)) return v; if(!fb) fb=v; }catch(e){} } return fb; })();
 const fmt=(t,o)=>new Date(t).toLocaleString(undefined,o);
 const timeOf=t=>fmt(t,{hour:'2-digit',minute:'2-digit'});
 const dayOf=t=>fmt(t,{weekday:'short',day:'numeric',month:'short'});
