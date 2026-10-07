@@ -1,0 +1,59 @@
+# Copies the upcoming and recent launch schedule from Launch Library 2 (The Space Devs) to the `launches` branch every
+# hour, for the Launches page. Its free tier allows 15 requests an hour; this uses 2. If the API is down or rate-limited,
+# the previous copy is kept, so the page always has something to show.
+name: Update launches
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+  push:            # also run straight away when this workflow or its script changes
+    branches: [main]
+    paths: ['.github/workflows/update-launches.yml', 'scripts/build_launches.py']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-launches
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      - name: Download from Launch Library 2
+        run: |
+          set -uo pipefail
+          mkdir -p out
+          LL=https://ll.thespacedevs.com/2.3.0
+          prev="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/launches"
+          fetch() {  # name url
+            for attempt in 1 2; do
+              code=$(curl -sS -A "Overhead satellite tracker (github.com/${GITHUB_REPOSITORY})" -o "out/$1" -w '%{http_code}' "$2") || code=000
+              if [ "$code" = 200 ] && python3 -c "import json,sys;json.load(open(sys.argv[1]))['results']" "out/$1"; then echo "$1: ok"; return 0; fi
+              echo "::warning::$1 attempt $attempt got HTTP $code"; sleep 20
+            done
+            rm -f "out/$1"
+            curl -sSf -o "out/$1" "$prev/$1" && echo "::warning::$1 kept previous copy" || echo "::warning::$1 unavailable"
+          }
+          fetch ll-upcoming.json "$LL/launches/upcoming/?mode=detailed&limit=40&hide_recent_previous=true"
+          fetch ll-previous.json "$LL/launches/previous/?mode=detailed&limit=8"
+          [ -f out/ll-upcoming.json ] || { echo "::error::no launch data at all"; exit 1; }
+          if [ -f scripts/build_launches.py ]; then python3 scripts/build_launches.py out; fi
+          date -u +%Y-%m-%dT%H:%MZ > out/updated.txt
+
+      - name: Publish to the launches branch
+        run: |
+          set -euo pipefail
+          cd out
+          git init -q -b launches
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Launch schedule $(cat updated.txt)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" launches
