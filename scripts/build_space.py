@@ -10,6 +10,7 @@ domain). Writes space.json into the directory given as argv[1]; the page also tr
   cycle      monthly sunspot numbers since 1996 plus NOAA's prediction
 """
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -94,8 +95,10 @@ def main(d):
     out["protons"] = [[r.get("time_tag"), num(r.get("flux"))] for r in pr if r.get("energy") == ">=10 MeV" and r.get("time_tag", "")[15] in "05"]
 
     now = datetime.now(timezone.utc)
-    sims = get("https://kauai.ccmc.gsfc.nasa.gov/DONKI/WS/get/WSAEnlilSimulations?startDate="
-               + (now - timedelta(days=7)).strftime("%Y-%m-%d") + "&endDate=" + now.strftime("%Y-%m-%d")) or []
+    # NASA's DONKI via api.nasa.gov; set a free key as the NASA_API_KEY repository secret if the shared demo key is busy
+    key = os.environ.get("NASA_API_KEY") or "DEMO_KEY"
+    span = "startDate=" + (now - timedelta(days=7)).strftime("%Y-%m-%d") + "&endDate=" + now.strftime("%Y-%m-%d")
+    sims = get(f"https://api.nasa.gov/DONKI/WSAEnlilSimulations?{span}&api_key={key}", tries=2) or []
     cmes = {}
     for s in sims:
         arrival = s.get("estimatedShockArrivalTime")

@@ -31,7 +31,7 @@ jobs:
           set -uo pipefail
           pip install -q pygrib numpy
           python3 scripts/build_weather.py out
-          python3 scripts/build_space.py out || echo "::warning::space weather not built"
+          NASA_API_KEY="${{ secrets.NASA_API_KEY }}" python3 scripts/build_space.py out || echo "::warning::space weather not built"
           prev="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/weather"
           # if a source was down, keep the previous copy rather than losing the layer
           for f in weather.json storms.json hazards.json quakes.json space-alerts.json volcanoes.json space.json; do
