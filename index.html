@@ -468,32 +468,41 @@ const passCache=new Map();
 function sunEcf(d){ const v=subsolarDir(d).normalize(); return {x:v.x,y:-v.z,z:v.y}; } // scene -> Earth-fixed unit vector (scene units are scaled, so normalise)
 const COMPASS=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const compass=az=>COMPASS[Math.round(((az*180/Math.PI)%360+360)%360/22.5)%16];
-function sightings(s){ if(!me) return [];
+function sightings(s){ if(!me) return {list:[],over:0,next:null};
   const key=s.name+'|'+Math.floor(Date.now()/6e5); if(passCache.has(key)) return passCache.get(key);
   const o=satellite.geodeticToEcf(me), on=Math.hypot(o.x,o.y,o.z), up={x:o.x/on,y:o.y/on,z:o.z/on};
-  const out=[], step=30e3, t0=Date.now()-5*60e3, t1=t0+5*864e5; let cur=null;
+  const list=[], step=30e3, t0=Date.now()-5*60e3, listEnd=t0+5*864e5, t1=t0+28*864e5; // list 5 days; look up to 4 weeks for the next one
+  let cur=null, over=0, wasUp=false, next=null;
   for(let t=t0;t<t1;t+=step){ const d=new Date(t), pv=satellite.propagate(s.rec,d); if(!pv.position||typeof pv.position!=='object') continue;
     const p=satellite.eciToEcf(pv.position,satellite.gstime(d)), la=satellite.ecfToLookAngles(me,p), el=la.elevation*180/Math.PI;
+    if(t<listEnd&&el>=10&&!wasUp) over++; wasUp=el>=10;
     let vis=false;
     if(el>=10){ const S=sunEcf(d); if(Math.asin(up.x*S.x+up.y*S.y+up.z*S.z)*180/Math.PI<-6){ const along=p.x*S.x+p.y*S.y+p.z*S.z, r2=p.x*p.x+p.y*p.y+p.z*p.z;
       vis=along>0||Math.sqrt(Math.max(0,r2-along*along))>6371; } }
     if(vis){ if(!cur) cur={start:t,end:t,startAz:la.azimuth,endAz:la.azimuth,maxEl:el}; else { cur.end=t; cur.endAz=la.azimuth; cur.maxEl=Math.max(cur.maxEl,el); } }
-    else if(cur){ out.push(cur); cur=null; if(out.length>=5) break; } }
-  if(cur&&out.length<5) out.push(cur);
-  passCache.set(key,out); return out; }
+    else if(cur){ if(cur.start<listEnd&&list.length<5) list.push(cur); else { next=cur; break; } cur=null; }
+    if(t>=listEnd&&list.length) break; // already have this week's list; no need to look further
+  }
+  if(cur&&!next){ if(cur.start<listEnd&&list.length<5) list.push(cur); else next=cur; }
+  const res={list,over,next}; passCache.set(key,res); return res; }
 function whenLabel(t){ const d=new Date(t), n=new Date(), day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
   const diff=Math.round((day(d)-day(n))/864e5), am=d.getHours()<12, time=d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
   const name=diff===0?(am?'This morning':'Tonight'):diff===1?(am?'Tomorrow morning':'Tomorrow evening'):d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'});
   return name+' '+time; }
 const height=e=>e>=60?'almost overhead':e>=30?'high in the sky':'low in the sky';
-function nextIssSighting(){ const s=sats.find(x=>x.name.startsWith('ISS (ZARYA)')); const p=s&&sightings(s).find(x=>x.end>=Date.now()); if(!p) return '';
+function nextIssSighting(){ const s=sats.find(x=>x.name.startsWith('ISS (ZARYA)')); if(!s) return ''; const r=sightings(s), p=r.list.find(x=>x.end>=Date.now())||r.next;
+  if(!p) return 'The ISS won’t be visible from where you are for at least 4 weeks.';
   return p.start<=Date.now()?'The ISS is visible right now: look '+compass(p.endAz)+'!':'Next time you can see the ISS: '+whenLabel(p.start).replace(/^T/,'t')+', look '+compass(p.startAz)+'.'; }
 function canSpot(s){ return s&&(s.groups.includes(0)||s.groups.includes(1)); } // stations and the "brightest objects" list
 function renderPasses(s){ const box=document.getElementById('passes'); if(!canSpot(s)){ box.style.display='none'; return; }
   let h='<h3>See it from where you are</h3>';
   if(!me) h+='<div class="note">'+esc(s.name)+' is bright enough to see with your own eyes. Share your location to find out when it passes over you.</div><button id="passLoc">Find sightings near me</button>';
-  else { const list=sightings(s).filter(p=>p.end>=Date.now());
-    if(!list.length) h+='<div class="note">No visible passes from your location in the next 5 days. Satellites can only be seen around dusk and dawn, when your sky is dark but they are still in sunlight.</div>';
+  else { const r=sightings(s), list=r.list.filter(p=>p.end>=Date.now());
+    if(!list.length){
+      if(!r.over&&!r.next) h+='<div class="note">'+esc(s.name)+' never rises high enough to be seen from where you are: its orbit doesn’t come far enough '+(me.latitude>0?'north':'south')+'.</div>';
+      else { h+='<div class="note">No sightings from where you are in the next 5 days.'+(r.over?' It passes over you '+r.over+' time'+(r.over===1?'':'s')+' in that time, but always in daylight or while it is in Earth’s shadow, so it can’t be seen.':'')+'</div>';
+        if(r.next) h+='<div class="pass"><b>Next sighting: '+whenLabel(r.next.start)+'</b> · '+Math.max(1,Math.round((r.next.end-r.next.start+30e3)/60e3))+' min<div class="dir">Appears in the '+compass(r.next.startAz)+', rises to '+Math.round(r.next.maxEl)+'° ('+height(r.next.maxEl)+'), disappears in the '+compass(r.next.endAz)+'</div></div>';
+        else h+='<div class="note">No sightings in the next 4 weeks either.</div>'; } }
     else { h+=list.map(p=>{ const now=p.start<=Date.now(), mins=Math.max(1,Math.round((p.end-p.start+30e3)/60e3));
         return '<div class="pass'+(now?' now':'')+'"><b>'+(now?'Visible right now':whenLabel(p.start))+'</b> · '+mins+' min'
           +'<div class="dir">Appears in the '+compass(p.startAz)+', rises to '+Math.round(p.maxEl)+'° ('+height(p.maxEl)+'), disappears in the '+compass(p.endAz)+'</div></div>'; }).join('');
