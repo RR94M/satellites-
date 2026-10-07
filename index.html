@@ -96,7 +96,14 @@ button.primary{background:var(--accent);color:var(--onaccent);border-color:var(-
 /* compass: which way you're facing, from the phone's compass */
 #cmpBtn{position:absolute;right:14px;top:80px;width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center;background:var(--hudbtn);color:var(--hud);border-color:var(--line)}
 #cmpBtn svg{width:22px;height:22px}
-#cmp{position:absolute;right:14px;top:80px;width:184px;padding:12px;border-radius:14px;background:var(--hudbtn);border:1px solid var(--line);color:var(--hud);text-align:center;display:none;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#youBtn{position:absolute;right:14px;top:128px;width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center;background:var(--hudbtn);color:var(--you);border:1.5px solid var(--you)}
+#youBtn svg{width:22px;height:22px}
+#youTime{position:absolute;right:62px;top:132px;max-width:calc(100% - 140px);display:none;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:var(--hudbtn);border:1px solid var(--you);color:var(--hud);font-size:13px;white-space:nowrap;cursor:pointer}
+#youTime.on{display:flex}
+#youTime b{font-weight:600;font-variant-numeric:tabular-nums;color:var(--you)}
+#youTime span{overflow:hidden;text-overflow:ellipsis}
+#youTime small{color:var(--hud2);font-size:11px}
+#cmp{z-index:3;position:absolute;right:14px;top:80px;width:184px;padding:12px;border-radius:14px;background:var(--hudbtn);border:1px solid var(--line);color:var(--hud);text-align:center;display:none;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #cmp.on{display:block}
 #cmp .x{position:absolute;right:6px;top:4px;background:none;border:0;color:var(--hud2);font-size:18px;padding:2px 6px}
 #cmp svg{width:132px;height:132px;display:block;margin:2px auto 6px}
@@ -212,6 +219,8 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     <div id="loading"><div><b>Loading the satellite catalogue</b><span id="loadmsg">Fetching orbital elements from CelesTrak...</span></div></div>
     <div class="hint">Drag to spin. Scroll or pinch to zoom. Tap a dot to follow it.</div>
     <button id="cmpBtn" aria-label="Compass: which way am I facing?" title="Compass"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4.5 L15 12 H9Z" fill="var(--accent)"/><path d="M12 19.5 L9 12 H15Z" fill="currentColor" opacity=".6"/></svg></button>
+    <button id="youBtn" aria-label="My location" title="My location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-6.1-6.5-11a6.5 6.5 0 0 1 13 0c0 4.9-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.6" fill="currentColor"/></svg></button>
+    <button id="youTime" aria-label="Your place and its local time: fly the globe there"><span id="youPlace"></span><b id="youClock"></b><small id="youZone"></small></button>
     <div id="cmp" role="dialog" aria-label="Compass"><button class="x" id="cmpClose" aria-label="Close compass">×</button><svg viewBox="-70 -70 140 140" aria-hidden="true"><g class="dial" id="cmpDial"><circle class="ring" r="60"/><g id="cmpTicks"></g><text class="n" y="-46">N</text><text x="46">E</text><text y="46">S</text><text x="-46">W</text></g><path class="me" d="M0,-66 L7,-52 H-7Z"/><circle r="3" class="me"/></svg><b id="cmpDir">Starting…</b><span id="cmpNote">Hold your phone flat, top pointing the way you’re facing.</span></div>
     <div class="timebar" id="timebar"><button id="tPlay" aria-label="Play time forward fast">▶</button><input type="range" id="tRange" min="-720" max="1440" step="1" value="0" aria-label="Time, in minutes from now"><button id="tNow" class="on">Live</button></div>
     <div class="viewbtns"><button id="reset">Reset view</button><button id="follow" style="display:none">Fly to it</button></div>
@@ -690,8 +699,8 @@ function setMe(l,fly){ me={latitude:l.lat*Math.PI/180,longitude:l.lon*Math.PI/18
   hb.style.display='inline-block'; you.style.display='block'; if(fly) flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4));
   placebox.innerHTML='Your location: '+esc(WHERE.label(l))+', saved on this device only · <button class="link" id="placeChange">Change</button> · <button class="link" id="placeForget">Forget</button>';
   document.getElementById('placeChange').onclick=()=>askPlace(''); document.getElementById('placeForget').onclick=clearMe;
-  passCache.clear(); tick(true); renderPasses(sel); describeAurora(); }
-function clearMe(){ WHERE.forget(); me=null; myTime=null; youMarker.visible=youRing.visible=false; horizonOnly=false; hb.classList.remove('on'); hb.style.display='none';
+  passCache.clear(); tick(true); renderPasses(sel); describeAurora(); youLabel(); }
+function clearMe(){ WHERE.forget(); me=null; myTime=null; document.getElementById('youTime').classList.remove('on'); youMarker.visible=youRing.visible=false; horizonOnly=false; hb.classList.remove('on'); hb.style.display='none';
   you.style.display='none'; placebox.innerHTML=''; passCache.clear(); refresh(); renderPasses(sel); describeAurora(); }
 function askPlace(msg){ placebox.innerHTML=(msg?'<div class="warn">'+esc(msg)+'</div>':'Type your town, or use the “Use my location” button above.')+'<div id="placePick"></div>';
   WHERE.picker(document.getElementById('placePick'),l=>setMe(l,true)).focus(); }
@@ -702,6 +711,17 @@ hb.onclick=()=>{ horizonOnly=!horizonOnly; hb.classList.toggle('on',horizonOnly)
 
 // loop
 let last=0, interval=1000, lastTrack=0;
+// my location on the map: a teal button under the compass, and your place with its local time beside it
+const youTimeEl=document.getElementById('youTime'), youClockEl=document.getElementById('youClock');
+function youLabel(){ const l=WHERE.saved(); if(!me||!myTime){ youTimeEl.classList.remove('on'); return; }
+  const place=l&&l.name&&!/^-?\d/.test(l.name)?l.name.split(',')[0]:myTime.zone.includes('/')?myTime.zone.split('/').pop().replace(/_/g,' '):'Your location';
+  document.getElementById('youPlace').textContent='📍 '+place; document.getElementById('youZone').textContent=myTime.abbr; youTimeEl.classList.add('on'); youClock(simNow()); }
+let lastSec=-1;
+function youClock(now){ if(!myTime) return; const sec=Math.floor(now/1e3); if(sec===lastSec) return; lastSec=sec;
+  youClockEl.textContent=now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:myTime.zone}); }
+function flyHome(){ if(!me) return; flyTo(youMarker.position.clone().normalize().multiplyScalar(R*2.4)); }
+document.getElementById('youBtn').onclick=()=>{ if(me) flyHome(); else requestLocation(); };
+youTimeEl.onclick=flyHome;
 // time slider: the globe can show any moment from 12 hours ago to 24 hours ahead (sightings and the
 // "What's that light?" finder always use the real time)
 let simOffset=0, simPlay=0, lastFrame=performance.now();
@@ -718,7 +738,7 @@ tNow.onclick=()=>setSim(0,0);
 renderer.domElement.addEventListener('pointerdown',()=>{ const h=document.querySelector('.hint'); if(h) h.style.opacity=0; },{once:true});
 function tick(force){ const fnow=performance.now(), dt=fnow-lastFrame; lastFrame=fnow;
   if(simPlay){ simOffset+=dt*simPlay; if(simOffset>=1440*6e4){ simOffset=1440*6e4; simPlay=0; } tRange.value=Math.round(simOffset/6e4); simLabel(); }
-  const now=simNow(); document.getElementById('utc').textContent=now.toISOString().slice(11,19);
+  const now=simNow(); document.getElementById('utc').textContent=now.toISOString().slice(11,19); youClock(now);
   if(force||(simPlay?fnow-(tick.lp||0)>=interval:Math.abs(now-last)>=interval)){ last=now; tick.lp=fnow; const t0=performance.now(); propagate(now); const took=performance.now()-t0; interval=simPlay?Math.max(120,took*1.6):took>400?2000:1000; refresh(); updateSel(); updateFootprints();
     const sd=subsolarDir(now); sun.position.copy(sd).multiplyScalar(100); night.material.uniforms.sunDir.value.copy(sd).normalize();
     if(me){ const above=sats.filter(s=>s.ok&&s.el>0).length; const nx=nextIssSighting(); you.textContent=above.toLocaleString()+' satellites '+(simOffset?'were or will be above your horizon at that time.':'are above your horizon right now.')+(nx?' '+nx:''); }
