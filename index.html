@@ -2,6 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0B1424">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Overhead">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="stylesheet" href="lib/app.css">
+<script src="lib/app.js" defer></script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Overhead - every active satellite, live in 3D</title>
 <meta name="description" content="Every active satellite, live on a 3D globe. Follow the ISS, see who is on board, and find out when you can spot it from where you are.">
@@ -198,9 +208,6 @@ button.on{border-color:var(--accent)}
 #sel{display:none;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
 .selhead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .selhead .x{background:none;border:0;color:var(--ink3);font-size:20px;line-height:1;padding:0 2px}
-nav.pages{display:flex;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}
-nav.pages a{flex:1;text-align:center;padding:7px 4px;border-radius:7px;text-decoration:none;color:var(--ink2);font-size:14px;white-space:nowrap}
-nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
 details.more>summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 0;list-style:none}
 details.more>summary::-webkit-details-marker{display:none}
 details.more>summary::before{content:'▸ ';color:var(--ink3)}
@@ -263,10 +270,9 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
   #app{grid-template-rows:1fr;grid-template-columns:1fr 340px}
   #panel{border-top:0;border-left:1px solid var(--line);max-height:none;align-content:start;padding-top:14px}
 }
-@media (max-width:420px){nav.pages .lg{display:none} nav.pages a{font-size:13px}}
 </style>
 </head>
-<body>
+<body class="globe">
 <script>try{ if(localStorage.getItem('ovh:panel')==='hidden') document.body.classList.add('nopanel'); }catch(e){}</script>
 <div id="app">
   <div id="mapwrap">
@@ -289,7 +295,6 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     <div class="viewbtns"><button id="reset">Reset view</button><button id="follow" style="display:none">Fly to it</button><button id="panelBtn" aria-controls="panel" aria-expanded="true">Hide menu</button></div>
   </div>
   <div id="panel">
-    <nav class="pages" aria-label="Pages"><a class="on" aria-current="page" href="./">Live globe</a><a href="tonight.html">Tonight<span class="lg">’s sky</span></a><a href="launches.html">Launches</a><a href="alerts.html">Alerts</a></nav>
     <div class="row">
       <input id="q" type="search" placeholder="Find a satellite or astronaut (ISS, NASA, weather...)" autocomplete="off">
       <button id="locbtn">Use my location</button>

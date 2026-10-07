@@ -2,6 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0B1424">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Overhead">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="stylesheet" href="lib/app.css">
+<script src="lib/app.js" defer></script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Space weather - Overhead</title>
 <script>try{var p=localStorage.getItem('ovh:theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p}catch(e){document.documentElement.dataset.theme='dark'}</script>
@@ -44,10 +54,6 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Space Grotesk",
 main{max-width:760px;margin:0 auto;display:grid;gap:14px}
 a{color:var(--ink2)}
 header{display:grid;gap:6px}
-nav.pages{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
-nav.pages a{flex:1;text-align:center;padding:7px 4px;border-radius:7px;text-decoration:none;color:var(--ink2);font-size:14px;white-space:nowrap}
-nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
-@media (max-width:420px){nav.pages .lg{display:none} nav.pages a{font-size:13px}}
 .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 h1{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:0}
 button{font:inherit;font-size:14px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
@@ -144,7 +150,6 @@ footer{color:var(--ink3);font-size:12px;max-width:760px;margin:16px auto 0}
 <body>
 <main>
   <header>
-    <nav class="pages" aria-label="Pages"><a href="./">Live globe</a><a href="tonight.html">Tonight<span class="lg">’s sky</span></a><a href="launches.html">Launches</a><a href="alerts.html">Alerts</a></nav>
     <div class="top"><h1>Space weather</h1><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
   </header>
   <div id="content"><section><p class="loading">Loading the latest from the Sun…</p></section></div>

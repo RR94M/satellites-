@@ -1,0 +1,22 @@
+{
+  "name": "Overhead: satellites, sky and space weather",
+  "short_name": "Overhead",
+  "description": "Every satellite live on a 3D globe, what you can see tonight, launches, alerts and space weather.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0B1424",
+  "theme_color": "#0B1424",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Tonight's sky", "url": "tonight.html", "icons": [{"src": "icons/icon-192.png", "sizes": "192x192"}]},
+    {"name": "Launches", "url": "launches.html", "icons": [{"src": "icons/icon-192.png", "sizes": "192x192"}]},
+    {"name": "Space weather", "url": "spaceweather.html", "icons": [{"src": "icons/icon-192.png", "sizes": "192x192"}]},
+    {"name": "Alerts", "url": "alerts.html", "icons": [{"src": "icons/icon-192.png", "sizes": "192x192"}]}
+  ]
+}

@@ -1,0 +1,38 @@
+/* The app shell shared by every page: the tab bar (bottom on phones, top on computers) and the alerts badge.
+   Colours come from each page's own tokens (--panel, --line, --ink2, --accent). */
+:root{--tabh:58px}
+body{padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 14px)!important}
+nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:space-around;align-items:stretch;
+  height:calc(var(--tabh) + env(safe-area-inset-bottom));padding:0 max(6px,env(safe-area-inset-left)) env(safe-area-inset-bottom) max(6px,env(safe-area-inset-right));
+  background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);
+  border-top:1px solid var(--line)}
+nav.tabbar a{position:relative;flex:1;max-width:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  text-decoration:none;color:var(--ink3,var(--ink2));font-size:11px;font-weight:500;letter-spacing:.01em;-webkit-tap-highlight-color:transparent}
+nav.tabbar svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.tabbar a.on{color:var(--accent)}
+nav.tabbar a.on::before{content:'';position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--accent)}
+nav.tabbar a:focus-visible{outline:2px solid var(--accent);outline-offset:-4px;border-radius:10px}
+nav.tabbar .badge{position:absolute;top:6px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:#E5484D;color:#fff;
+  font-size:11px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px var(--panel)}
+nav.tabbar .badge[hidden]{display:none}
+/* computers: a slim bar along the top */
+@media (min-width:900px){
+  :root{--tabh:52px}
+  body{padding-bottom:max(24px,env(safe-area-inset-bottom))!important;padding-top:calc(var(--tabh) + 16px)!important}
+  nav.tabbar{top:0;bottom:auto;height:var(--tabh);padding:0 16px;border-top:0;border-bottom:1px solid var(--line);justify-content:center;gap:6px}
+  nav.tabbar a{flex:0 0 auto;max-width:none;flex-direction:row;gap:8px;padding:0 16px;font-size:14px}
+  nav.tabbar svg{width:20px;height:20px}
+  nav.tabbar a.on::before{top:auto;bottom:0;left:16px;right:16px;border-radius:3px 3px 0 0}
+  nav.tabbar .badge{top:8px;left:auto;right:4px}
+}
+/* the globe page fills the screen around the bar */
+body.globe{padding:0!important}
+body.globe #app{position:fixed;left:0;right:0;top:0;bottom:calc(var(--tabh) + env(safe-area-inset-bottom));height:auto}
+@media (min-width:900px){ body.globe #app{top:var(--tabh);bottom:0} }
+/* "installed" hint: a gentle prompt to add to the home screen, shown once */
+.installhint{position:fixed;left:12px;right:12px;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 10px);z-index:41;max-width:520px;margin:0 auto;
+  display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:14px;background:var(--panel);border:1px solid var(--line);box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:13px;color:var(--ink2,var(--ink))}
+.installhint b{color:var(--ink)}
+.installhint button{flex:none;font:inherit;font-size:13px;border-radius:8px;padding:6px 10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.installhint button.go{background:var(--accent);border-color:var(--accent);color:var(--onaccent,#fff);font-weight:600}
+@media (min-width:900px){ .installhint{bottom:20px} }

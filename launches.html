@@ -2,6 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0B1424">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Overhead">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="stylesheet" href="lib/app.css">
+<script src="lib/app.js" defer></script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Launches - Overhead</title>
 <script>try{var p=localStorage.getItem('ovh:theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p}catch(e){document.documentElement.dataset.theme='dark'}</script>
@@ -10,6 +20,7 @@
 <meta property="og:description" content="What's launching next, who's on board, and where to watch it live.">
 <meta property="og:type" content="website">
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script src="lib/aurora.js"></script>
 <script src="lib/where.js"></script>
 <script src="lib/calendar.js"></script>
 <style>
@@ -131,17 +142,12 @@ svg.map text.n{font-weight:600;font-size:10px;fill:var(--ink2)}
 .calmenu a,.calmenu button{font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;text-decoration:none;color:var(--ink);background:var(--panel2)}
 .update{border-left:3px solid var(--accent);padding-left:10px;color:var(--ink2);font-size:14px}
 footer{color:var(--ink3);font-size:12px;max-width:680px;margin:16px auto 0}
-nav.pages{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
-nav.pages a{flex:1;text-align:center;padding:7px 4px;border-radius:7px;text-decoration:none;color:var(--ink2);font-size:14px;white-space:nowrap;border:0}
-nav.pages a.on{background:var(--accent);color:var(--onaccent);font-weight:500}
 .top h1{margin:0}
-@media (max-width:420px){nav.pages .lg{display:none} nav.pages a{font-size:13px}}
 </style>
 </head>
 <body>
 <main>
   <header>
-    <nav class="pages" aria-label="Pages"><a href="./">Live globe</a><a href="tonight.html">Tonight<span class="lg">’s sky</span></a><a href="launches.html" class="on" aria-current="page">Launches</a><a href="alerts.html">Alerts</a></nav>
     <div class="top"><h1>Launches</h1><div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
     <p class="intro">Every rocket going up around the world: what it’s carrying, who’s on board, when, and where to watch it live. Tap a launch for the details.</p>
   </header>
