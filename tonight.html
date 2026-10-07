@@ -171,7 +171,11 @@ function passRow(what,p,extra){ const now=p.start<=Date.now();
 // ---------- aurora ----------
 // Geomagnetic latitude (dipole pole 80.8N 72.7W) and the Kp at which aurora usually reaches your horizon
 // (the visibility line moves about 2 degrees of geomagnetic latitude towards the equator per Kp step).
-function magLat(lat,lon){ const p=80.8*D2R, l=-72.7*D2R, a=lat*D2R, b=lon*D2R; return Math.asin(Math.sin(a)*Math.sin(p)+Math.cos(a)*Math.cos(p)*Math.cos(b-l))/D2R; }
+// Earth's field is lopsided, and the southern aurora zone sits closer to Australia and New Zealand than a centred
+// dipole suggests. So in the south we also measure from a point fitted to published guidance (Hobart ~Kp 4-5 from a
+// dark site, Melbourne 6-8, Christchurch 6, Invercargill 4-5) and use whichever gives the better chance.
+function magLat(lat,lon){ const a=lat*D2R, b=lon*D2R, from=(pl,pn)=>Math.asin(Math.sin(a)*Math.sin(pl*D2R)+Math.cos(a)*Math.cos(pl*D2R)*Math.cos(b-pn*D2R))/D2R;
+  const dip=Math.abs(from(80.8,-72.7)); return lat<0?Math.max(dip,Math.abs(from(-74.25,126))):dip; }
 function auroraVerdict(kp,need){ if(kp>=need+1) return ['good','Good chance']; if(kp>=need) return ['maybe','Possible, low on the horizon']; if(kp>=need-1) return ['low','Unlikely, worth a look if it’s clear']; return ['low','Very unlikely']; }
 
 // ---------- data ----------
@@ -217,7 +221,7 @@ function render(){ setWhere(); const out=[];
   const slots=Array.isArray(kp)?kp.map(x=>({t:Date.parse(x.time_tag+'Z'),kp:+x.kp,kind:x.observed})).filter(x=>isFinite(x.t)&&isFinite(x.kp)):[];
   if(!slots.length) au+='<p class="note">The aurora forecast isn’t available right now.</p>';
   else { const ml=magLat(loc.lat,loc.lon), need=Math.max(0,Math.min(9,(66.5-Math.abs(ml))/2.05)), side=loc.lat>=0?'northern':'southern';
-    au+='<p class="sub">Based on NOAA’s 3-day Kp forecast. '+(need>=8.5?'You’re a long way from the aurora zone: it only reaches your '+side+' horizon in extreme storms (Kp 9).':'Where you are, aurora usually needs Kp '+need.toFixed(1)+' or more to show on the '+side+' horizon.')+'</p><div class="nights">';
+    au+='<p class="sub">Based on NOAA’s 3-day Kp forecast. '+(need>=8.5?'You’re a long way from the aurora zone: it only reaches your '+side+' horizon in extreme storms (Kp 9).':'Where you are, aurora usually needs Kp '+need.toFixed(1)+' or more to show on the '+side+' horizon, seen from a dark spot away from city lights.')+'</p><div class="nights">';
     for(let k=0;k<3;k++){ const s0=ws+k*864e5, e=k===0?ev:darkness(obs,s0), a=e.dark||s0+6*36e5, b=e.darkEnd||s0+18*36e5;
       const inNight=slots.filter(x=>x.t+3*36e5>a&&x.t<b); const top=inNight.length?Math.max(...inNight.map(x=>x.kp)):null;
       const label=k===0?'Tonight':new Date(s0).toLocaleDateString(undefined,{weekday:'long'});
