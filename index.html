@@ -53,7 +53,7 @@ canvas{display:block;touch-action:none}
 #label{position:absolute;pointer-events:none;color:var(--accent);font-size:13px;font-weight:500;transform:translate(10px,-8px);white-space:nowrap;text-shadow:0 1px 3px var(--halo),0 0 2px var(--halo)}
 #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--veil);color:var(--hud);text-align:center;padding:24px;font-size:15px}
 #loading span{display:block;color:var(--hud2);font-size:13px;margin-top:6px}
-#panel{background:var(--panel);border-top:1px solid var(--line);padding:10px 14px 12px;display:grid;gap:10px;max-height:44vh;overflow:auto}
+#panel{background:var(--panel);border-top:1px solid var(--line);padding:10px 14px 12px;display:grid;grid-auto-rows:max-content;gap:10px;max-height:44vh;overflow:auto} /* rows keep their height; the panel scrolls instead of squashing them */
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 input[type=search]{flex:1;min-width:160px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:9px 12px;font:inherit;font-size:15px}
 input[type=search]:focus{outline:2px solid var(--accent);outline-offset:1px}
