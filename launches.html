@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Launches - Overhead</title>
+<script>try{var p=localStorage.getItem('ovh:theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p}catch(e){document.documentElement.dataset.theme='dark'}</script>
+<meta name="description" content="Every upcoming rocket launch: what's going up, who's on board, when, where to watch it live, and where it's heading. Add any launch to your calendar.">
+<meta property="og:title" content="Launches - Overhead">
+<meta property="og:description" content="What's launching next, who's on board, and where to watch it live.">
+<meta property="og:type" content="website">
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script src="lib/where.js"></script>
+<script src="lib/calendar.js"></script>
+<style>
+/* Space Grotesk, self-hosted (SIL Open Font License, see fonts/OFL.txt) */
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/space-grotesk-latin-600-normal.woff2) format("woff2")}
+:root{
+  --bg:#0F1A2E; --panel:#1A2D4A; --panel2:#213858; --line:#2E4A72;
+  --ink:#EAF0F8; --ink2:#A9BAD2; --ink3:#7489A8;
+  --accent:#F2B340; --onaccent:#0F1A2E; --sea:#0B1B33; --land:#3A6496; --coast:#5E86B8;
+  --good:#7FE0C6; --maybe:#F2B340; --low:#A9BAD2; --bad:#FF8A80; --live:#FF5252;
+}
+:root[data-theme="light"]{
+  --bg:#E8EEF6; --panel:#FFFFFF; --panel2:#F1F5FA; --line:#C9D5E5;
+  --ink:#13223A; --ink2:#3E5476; --ink3:#5A6E8C;
+  --accent:#B45309; --onaccent:#FFFFFF; --sea:#CFE0F2; --land:#F4EEDD; --coast:#8EA3BF;
+  --good:#0F766E; --maybe:#B45309; --low:#5A6E8C; --bad:#B42318; --live:#C62828;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;
+  padding:max(14px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+main{max-width:680px;margin:0 auto;display:grid;gap:14px}
+a{color:var(--ink2)}
+header{display:grid;gap:6px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+nav{display:flex;gap:6px}
+nav a{font-size:14px;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink)}
+h1{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:4px 0 0}
+.intro{color:var(--ink2);font-size:14px;margin:0}
+button{font:inherit;font-size:14px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 10px;font-size:13px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--onaccent);font-weight:500}
+.filters{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.filters .note{margin:0}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+section>h2{font-size:17px;font-weight:600;margin:0 0 8px}
+.note{color:var(--ink3);font-size:13px;margin:8px 0 0}
+/* one launch */
+details.ln{border-top:1px solid var(--line)}
+section>details.ln:first-of-type{border-top:0}
+details.ln>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 0}
+details.ln>summary::-webkit-details-marker{display:none}
+details.ln>summary .t{font-weight:600;font-size:16px;line-height:1.3}
+details.ln>summary .m{color:var(--ink2);font-size:13px;grid-column:1}
+details.ln>summary .w{color:var(--ink);font-size:14px;grid-column:1}
+details.ln>summary .side{grid-column:2;grid-row:1/span 3;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+details.ln>summary .more{color:var(--ink3);font-size:12px}
+details.ln[open]>summary .more{visibility:hidden}
+.chip{display:inline-block;font-size:12px;border:1px solid currentColor;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.chip.good{color:var(--good)}.chip.maybe{color:var(--maybe)}.chip.low{color:var(--low)}.chip.bad{color:var(--bad)}.chip.live{color:var(--live);font-weight:600}
+.chip.crew{color:var(--accent)}
+.cd{font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent)}
+.body{display:grid;gap:14px;padding:0 0 16px}
+.body h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin:0 0 4px}
+.body p{margin:0}
+.pic{width:100%;max-height:220px;object-fit:cover;border-radius:10px;display:block;background:var(--panel2)}
+.credit{color:var(--ink3);font-size:11px;margin-top:3px}
+.big{font-size:18px;font-weight:600}
+.crew{display:grid;gap:8px}
+.crew div{display:flex;gap:10px;align-items:center}
+.crew img{width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--panel2);flex:none}
+.crew b{display:block;font-weight:500}
+.crew span{color:var(--ink3);font-size:13px}
+.watch{display:grid;gap:6px}
+.watch a{display:block;border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-decoration:none;color:var(--ink);background:var(--panel2)}
+.watch a small{display:block;color:var(--ink3)}
+.watch a.live{border-color:var(--live)}
+svg.map{width:100%;height:auto;display:block;border-radius:10px;border:1px solid var(--line)}
+svg.map .sea{fill:var(--sea)}
+svg.map .land{fill:var(--land);stroke:var(--coast);stroke-width:.6}
+svg.map .path{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-dasharray:6 4;stroke-linecap:round}
+svg.map .pad{fill:var(--accent);stroke:var(--panel);stroke-width:2}
+svg.map .you{fill:var(--good);stroke:var(--panel);stroke-width:2}
+svg.map text{font-family:inherit;font-size:11px;fill:var(--ink)}
+.tl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:14px}
+.tl span{color:var(--ink3);font-variant-numeric:tabular-nums;text-align:right}
+.links{display:flex;flex-wrap:wrap;gap:6px}
+.links a{font-size:13px;border:1px solid var(--line);border-radius:8px;padding:5px 10px;text-decoration:none;color:var(--ink)}
+.cal summary{font-size:14px;display:inline-block;border:1px solid var(--accent);border-radius:8px;padding:7px 12px;color:var(--ink);cursor:pointer;list-style:none}
+.cal summary::-webkit-details-marker{display:none}
+.cal[open] summary{background:var(--accent);color:var(--onaccent)}
+.calmenu{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:6px}
+.calmenu a,.calmenu button{font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;text-decoration:none;color:var(--ink);background:var(--panel2)}
+.update{border-left:3px solid var(--accent);padding-left:10px;color:var(--ink2);font-size:14px}
+footer{color:var(--ink3);font-size:12px;max-width:680px;margin:16px auto 0}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="top"><nav><a href="./">← 3D globe</a><a href="tonight.html">Tonight</a></nav>
+      <div class="seg" id="theme" role="group" aria-label="Colour theme"><button data-t="auto">Auto</button><button data-t="dark">Dark</button><button data-t="light">Light</button></div></div>
+    <h1>Launches</h1>
+    <p class="intro">Every rocket going up around the world: what it’s carrying, who’s on board, when, and where to watch it live. Tap a launch for the details.</p>
+  </header>
+  <div class="filters"><div class="seg" id="filter" role="group" aria-label="Show"><button data-f="all" class="on">All</button><button data-f="crew">With people on board</button><button data-f="week">Next 7 days</button></div><span class="note" id="tz"></span></div>
+  <div id="content"><section><p class="note">Loading the launch schedule…</p></section></div>
+</main>
+<footer>Schedule from <a href="https://thespacedevs.com/llapi" target="_blank" rel="noopener">The Space Devs’ Launch Library 2</a>, refreshed every hour. Launch times often change, sometimes minutes before liftoff: check here or the official webcast on the day. Trajectory simulations by <a href="https://flightclub.io" target="_blank" rel="noopener">FlightClub</a>. The flight direction on each map is our estimate from the target orbit, not an official flight plan.</footer>
+<script>
+(async function(){
+const DATA='https://raw.githubusercontent.com/RR94M/satellites-/launches/';
+const $=id=>document.getElementById(id);
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const D2R=Math.PI/180;
+
+// ---------- theme (shared with the other pages) ----------
+let themePref='auto'; try{ themePref=localStorage.getItem('ovh:theme')||'auto'; }catch(e){}
+const mq=matchMedia('(prefers-color-scheme: light)');
+function applyTheme(){ document.documentElement.dataset.theme=themePref==='auto'?(mq.matches?'light':'dark'):themePref;
+  document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.t===themePref)); }
+document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{ themePref=b.dataset.t; try{ localStorage.setItem('ovh:theme',themePref); }catch(e){} applyTheme(); });
+mq.addEventListener('change',()=>{ if(themePref==='auto') applyTheme(); }); applyTheme();
+
+// ---------- times: in your phone's time zone, with the launch site's own clock alongside ----------
+const zoneName=(()=>{ try{ return new Intl.DateTimeFormat(undefined,{timeZoneName:'short'}).formatToParts(new Date()).find(p=>p.type==='timeZoneName').value; }catch(e){ return ''; } })();
+const fmt=(t,o)=>new Date(t).toLocaleString(undefined,o);
+const timeOf=t=>fmt(t,{hour:'2-digit',minute:'2-digit'});
+const dayOf=t=>fmt(t,{weekday:'short',day:'numeric',month:'short'});
+const exact=l=>['Second','Minute','Hour'].includes(l.precision);
+function whenText(l){ const t=Date.parse(l.net), y=new Date(t).getUTCFullYear();
+  switch(l.precision){
+    case 'Second': case 'Minute': return dayOf(t)+', '+timeOf(t);
+    case 'Hour': return dayOf(t)+', around '+timeOf(t);
+    case 'Day': return dayOf(t)+' (time not set yet)';
+    case 'Week': return 'Week of '+dayOf(t);
+    case 'Month': return fmt(t,{month:'long',year:'numeric',timeZone:'UTC'})+' (no date yet)';
+    case 'Quarter 1': return 'Jan–Mar '+y; case 'Quarter 2': return 'Apr–Jun '+y; case 'Quarter 3': return 'Jul–Sep '+y; case 'Quarter 4': return 'Oct–Dec '+y;
+    case 'Year Half 1': return 'First half of '+y; case 'Year Half 2': return 'Second half of '+y;
+    case 'Year': case 'Fiscal Year': return String(y);
+    default: return dayOf(t); } }
+function siteClock(l){ if(!exact(l)||!l.pad.tz) return ''; try{ const here=timeOf(l.net), there=new Date(l.net).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',timeZone:l.pad.tz});
+  return here===there?'':there+' at the launch site'; }catch(e){ return ''; } }
+function countdown(t){ const d=Math.round((t-Date.now())/1e3), a=Math.abs(d), dd=Math.floor(a/86400), hh=Math.floor(a%86400/3600), mm=Math.floor(a%3600/60), ss=a%60, p=n=>String(n).padStart(2,'0');
+  return (d>=0?'T−':'T+')+(dd?dd+'d ':'')+p(hh)+':'+p(mm)+':'+p(ss); }
+setInterval(()=>document.querySelectorAll('.cd[data-t]').forEach(e=>e.textContent=countdown(+e.dataset.t)),1000);
+
+// ---------- words for the data ----------
+const STATUS={Go:['good','Go for launch'],TBC:['maybe','Date to be confirmed'],TBD:['low','Date not fixed'],Hold:['maybe','On hold'],'In Flight':['live','In flight'],
+  Success:['good','Success'],Failure:['bad','Failed'],'Partial Failure':['bad','Partial failure']};
+const ORBIT={LEO:'Low Earth orbit: a few hundred kilometres up, circling the planet every 90 minutes or so.',SSO:'Sun-synchronous orbit: over the poles, passing each place at the same time of day. Used for imaging the Earth.',
+  PO:'Polar orbit: over the North and South Poles, so it sees the whole planet as Earth turns beneath it.',GTO:'Geostationary transfer orbit: the first step towards a fixed spot 35,786 km above the equator, where TV and communications satellites sit.',
+  GEO:'Geostationary orbit: 35,786 km above the equator, keeping pace with the Earth so it hangs over one spot.',MEO:'Medium Earth orbit, around 20,000 km up, where navigation satellites like GPS and Galileo fly.',
+  Sub:'Suborbital: up into space and straight back down, without going into orbit.',HEO:'Highly elliptical orbit: swings far out from Earth and back.',LO:'Heading to orbit the Moon.',TLI:'Heading to the Moon.',
+  Mars:'Heading to Mars.','ES-L2':'Heading to the Sun–Earth L2 point, 1.5 million km away.',Heliocentric:'Going into orbit around the Sun.',VLEO:'Very low Earth orbit, under 450 km up.'};
+const MOMENT={'GO for Prop Load':'Go for fuelling','Prop Load':'Fuelling starts','Stage 1 LOX Load':'First stage oxygen loading','Stage 2 LOX Load':'Second stage oxygen loading','Engine Chill':'Engines chilled','Startup':'Final countdown sequence',
+  'GO for Launch':'Go for launch','Ignition':'Engines ignite','Liftoff':'Liftoff','Max-Q':'Max-Q: toughest moment for the rocket','MECO':'First stage engines off','Stage 2 Separation':'Stages separate',
+  'SES-1':'Second stage engine starts','SECO-1':'Second stage engine off: in orbit','Fairing Separation':'Nose cone (fairing) opens','Stage 1 Landing':'Booster lands','Payload Separation':'Payload released',
+  'Booster Boostback Burn Startup':'Booster turns back','Entry Burn Startup':'Booster re-entry burn','Stage 1 Landing Burn':'Booster landing burn','BECO':'Side boosters off','Booster Separation':'Side boosters separate'};
+const KEEP=new Set(['GO for Launch','Liftoff','Max-Q','MECO','Stage 2 Separation','Fairing Separation','SECO-1','Stage 1 Landing','Payload Separation','Ignition','Prop Load','BECO','Booster Separation']);
+const flag=c=>c&&/^[A-Z]{2}$/.test(c.code||'')?String.fromCodePoint(...[...c.code].map(ch=>0x1F1A5+ch.charCodeAt(0)))+' ':'';
+const crewOf=l=>(l.spacecraft&&l.spacecraft.crew)||[];
+const rel=s=>{ const a=Math.abs(s), m=Math.floor(a/60), r=Math.round(a%60); return (s<0?'T−':'T+')+(m>=60?Math.floor(m/60)+'h '+(m%60)+'m':m?m+':'+String(r).padStart(2,'0'):r+'s'); };
+
+// ---------- where it's heading: launch direction from the target orbit (an estimate, said so on the page) ----------
+function inclination(l){ const text=[l.spacecraft&&l.spacecraft.destination,...l.programs,l.mission.description,l.name].join(' ');
+  if(/International Space Station|\bISS\b/i.test(text)) return [51.64,'the International Space Station'];
+  if(/Tiangong|Chinese Space Station|\bCSS\b/i.test(text)) return [41.47,'China’s Tiangong space station'];
+  const c=l.mission.orbitCode, lat=Math.abs(l.pad.lat);
+  if(c==='GTO'||c==='GEO') return [lat,null];
+  if(c==='SSO') return [97.6,null];
+  if(c==='PO') return [90,null];
+  return null; }
+function heading(l){ if(l.pad.lat==null) return null; const inc=inclination(l); if(!inc) return null;
+  const cl=Math.cos(l.pad.lat*D2R), x=Math.cos(inc[0]*D2R)/cl; let az=Math.abs(x)>1?90:Math.asin(x)/D2R; // launch azimuth (ignoring Earth's spin)
+  if(inc[0]>=80&&!(l.pad.country&&l.pad.country.code==='RU')) az=180-az; // polar and sun-synchronous: most sites fly south, Russia's fly north
+  return {az:(az+360)%360,target:inc[1]}; }
+const COMPASS=['north','north-north-east','north-east','east-north-east','east','east-south-east','south-east','south-south-east','south','south-south-west','south-west','west-south-west','west','west-north-west','north-west','north-north-west'];
+const compass=az=>COMPASS[Math.round(((az%360)+360)%360/22.5)%16];
+function travel(lat,lon,az,km){ const d=km/6371, a=lat*D2R, b=lon*D2R, t=az*D2R, la=Math.asin(Math.sin(a)*Math.cos(d)+Math.cos(a)*Math.sin(d)*Math.cos(t));
+  return [la/D2R,(b+Math.atan2(Math.sin(t)*Math.sin(d)*Math.cos(a),Math.cos(d)-Math.sin(a)*Math.sin(la)))/D2R]; }
+function distance(a,b){ const p=a[0]*D2R,q=b[0]*D2R,dl=(b[1]-a[1])*D2R; return 6371*2*Math.asin(Math.sqrt(Math.sin((q-p)/2)**2+Math.cos(p)*Math.cos(q)*Math.sin(dl/2)**2)); }
+function bearing(a,b){ const p=a[0]*D2R,q=b[0]*D2R,dl=(b[1]-a[1])*D2R; return (Math.atan2(Math.sin(dl)*Math.cos(q),Math.cos(p)*Math.sin(q)-Math.sin(p)*Math.cos(q)*Math.cos(dl))/D2R+360)%360; }
+
+// a small map around the launch site: land outlines, the pad, the estimated flight direction, and you if you're close
+let LAND=null;
+fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json').then(r=>r.json()).then(t=>{ const f=topojson.feature(t,t.objects.land), rings=[];
+  for(const g of f.features){ const ps=g.geometry.type==='Polygon'?[g.geometry.coordinates]:g.geometry.coordinates; for(const p of ps) for(const r of p) rings.push(r); }
+  LAND=rings; document.querySelectorAll('svg.map[data-k]').forEach(drawLand); }).catch(()=>{});
+const MAPS=[];
+function mapSvg(l,h){ const W=340,H=200, lat0=Math.max(-70,Math.min(70,l.pad.lat)), lon0=l.pad.lon, k=H/34, c=Math.cos(lat0*D2R);
+  const P=(la,lo)=>{ let d=lo-lon0; d=((d+540)%360)-180; return [W/2+d*c*k,H/2-(la-lat0)*k]; };
+  const k2=MAPS.push({P,W,H,lon0})-1; let out='<svg class="map" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Map of the launch site'+(h?', with the rocket heading '+compass(h.az):'')+'" data-k="'+k2+'"><rect class="sea" width="'+W+'" height="'+H+'"/><g class="landg"></g>';
+  if(h){ const pts=[]; for(let km=0;km<=2600;km+=100) pts.push(P(...travel(l.pad.lat,l.pad.lon,h.az,km)));
+    out+='<polyline class="path" points="'+pts.map(p=>p.map(v=>v.toFixed(1)).join(',')).join(' ')+'"/>';
+    const e=pts[pts.length-1], e2=pts[pts.length-3], ang=Math.atan2(e[1]-e2[1],e[0]-e2[0]);
+    out+='<path class="pad" d="M'+(e[0]+8*Math.cos(ang)).toFixed(1)+','+(e[1]+8*Math.sin(ang)).toFixed(1)+' L'+(e[0]+7*Math.cos(ang+2.5)).toFixed(1)+','+(e[1]+7*Math.sin(ang+2.5)).toFixed(1)+' L'+(e[0]+7*Math.cos(ang-2.5)).toFixed(1)+','+(e[1]+7*Math.sin(ang-2.5)).toFixed(1)+'Z"/>'; }
+  const me=WHERE.saved(); if(me){ const [x,y]=P(me.lat,me.lon); if(x>6&&x<W-6&&y>6&&y<H-6) out+='<circle class="you" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="5"/><text x="'+(x+8).toFixed(1)+'" y="'+(y+4).toFixed(1)+'">You</text>'; }
+  return out+'<circle class="pad" cx="'+W/2+'" cy="'+H/2+'" r="6"/></svg>'; }
+function drawLand(svg){ const m=MAPS[+svg.dataset.k], g=svg.querySelector('.landg'); if(!m||!LAND||!g||g.childNodes.length) return; let d='';
+  for(const ring of LAND){ let seg='', prev=null, inside=false;
+    for(const [lo,la] of ring){ const p=m.P(la,lo); if(p[0]>-200&&p[0]<m.W+200&&p[1]>-200&&p[1]<m.H+200) inside=true; seg+=(prev&&Math.abs(p[0]-prev[0])<m.W*2?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1); prev=p; }
+    if(inside) d+=seg+'Z'; }
+  g.innerHTML='<path class="land" d="'+d+'"/>'; }
+
+// ---------- one launch ----------
+function card(l,open){ const st=STATUS[l.status.abbrev]||['low',l.status.name||l.status.abbrev], t=Date.parse(l.net), crew=crewOf(l), soon=exact(l)&&t>Date.now()-3*36e5&&t<Date.now()+7*864e5;
+  const live=l.webcastLive||l.videos.some(v=>v.live)||l.status.abbrev==='In Flight';
+  let s='<details class="ln" id="'+esc(l.slug)+'"'+(open?' open':'')+'><summary><span class="t">'+esc(l.name)+'</span>'
+    +'<span class="m">'+esc(l.rocket)+' · '+esc(l.provider)+' · '+flag(l.pad.country)+esc(l.pad.location||'')+'</span>'
+    +'<span class="w">'+esc(whenText(l))+(soon?' · <span class="cd" data-t="'+t+'">'+countdown(t)+'</span>':'')+'</span>'
+    +'<span class="side">'+(live?'<span class="chip live">● Live</span>':'')+'<span class="chip '+st[0]+'" title="'+esc(l.status.description||'')+'">'+esc(st[1])+'</span>'
+    +(crew.length?'<span class="chip crew">'+crew.length+' on board</span>':'')+'<span class="more">Details ▾</span></span></summary><div class="body">';
+
+  if(l.image) s+='<div><img class="pic" src="'+esc(l.image)+'" alt="" loading="lazy" onerror="this.parentNode.remove()">'+(l.imageCredit?'<div class="credit">Image: '+esc(l.imageCredit)+'</div>':'')+'</div>';
+
+  // when
+  const clock=siteClock(l);
+  s+='<div><h3>When</h3><p class="big">'+esc(whenText(l))+(exact(l)?' <span class="note">'+esc(zoneName)+'</span>':'')+'</p>'
+    +(clock?'<p class="note">'+esc(clock)+'</p>':'')
+    +(l.windowStart&&l.windowEnd&&l.windowEnd!==l.windowStart&&exact(l)?'<p class="note">Launch window: '+timeOf(l.windowStart)+' to '+timeOf(l.windowEnd)+(dayOf(l.windowEnd)!==dayOf(l.windowStart)?' ('+dayOf(l.windowEnd)+')':'')+'</p>':'')
+    +(l.probability!=null&&l.probability>=0?'<p class="note">Weather: '+l.probability+'% chance it’s good enough to launch'+(l.weather?' (concerns: '+esc(l.weather)+')':'')+'.</p>':'')
+    +(l.hold?'<p class="note">On hold: '+esc(l.hold)+'</p>':'')+(l.fail?'<p class="note">What went wrong: '+esc(l.fail)+'</p>':'')+'</div>';
+  if(l.update) s+='<div class="update">Latest: '+esc(l.update.text)+' <span class="note">('+dayOf(l.update.at)+')</span></div>';
+
+  // calendar: only once there's a real date to put in it
+  if(t>Date.now()){ const url=location.origin+location.pathname+'#'+l.slug, title='Launch: '+l.name+' ('+l.rocket+')';
+    const detail=l.rocket+' by '+l.provider+' from '+(l.pad.location||'')+'. Launch times often change; check the latest before you tune in.';
+    if(exact(l)){ const a=Date.parse(l.windowStart||l.net), b=Math.max(Date.parse(l.windowEnd||l.net),a+30*6e4);
+      s+='<div>'+CALENDAR.menu({title,start:a,end:b,detail,url,alarmMinutes:30})+'<p class="note">Comes with a reminder 30 minutes before. If the launch moves, the page shows the new time; add it again.</p></div>'; }
+    else if(l.precision==='Day') s+='<div>'+CALENDAR.menu({title,start:t,end:t+864e5,detail,url,allDay:true})+'<p class="note">Added as an all-day event: the exact time hasn’t been announced yet.</p></div>';
+    else s+='<p class="note">No date has been set yet, so there’s nothing to add to a calendar. Check back closer to the time.</p>'; }
+
+  // what for
+  s+='<div><h3>What it’s for</h3><p>'+esc(l.mission.description||'No details published yet.')+'</p>'
+    +'<p class="note">'+[l.mission.type,l.mission.agencies.length?'For '+l.mission.agencies.join(', '):'',l.programs.length?'Part of '+l.programs.join(', '):''].filter(Boolean).map(esc).join(' · ')+'</p></div>';
+
+  // who
+  if(l.spacecraft){ const sc=l.spacecraft;
+    s+='<div><h3>'+(crew.length?'On board':'Spacecraft')+'</h3>'+(sc.name?'<p>'+esc(sc.name)+(sc.type&&sc.type!==sc.name?' ('+esc(sc.type)+')':'')+(sc.destination?', heading to '+esc(sc.destination):'')+'</p>':'');
+    if(crew.length) s+='<div class="crew">'+crew.map(c=>'<div>'+(c.image?'<img src="'+esc(c.image)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">':'<img alt="" style="visibility:hidden">')+'<p><b>'+esc(c.name)+'</b><span>'+c.countries.map(x=>flag(x)+esc(x.name)).join(', ')+(c.agency?' · '+esc(c.agency):'')+(c.role?' · '+esc(c.role):'')+'</span></p></div>').join('')+'</div>';
+    else if(/crew/i.test(sc.type||'')||/Shenzhou|Soyuz MS|Crew-/i.test(l.name)) s+='<p class="note">Crew not announced yet.</p>';
+    s+='</div>'; }
+
+  // where to watch
+  s+='<div><h3>Where to watch</h3>';
+  if(l.videos.length) s+='<div class="watch">'+l.videos.map(v=>'<a href="'+esc(v.url)+'" target="_blank" rel="noopener"'+(v.live?' class="live"':'')+'>'+(v.live?'● Live: ':'▶ ')+esc(v.title||v.publisher||'Webcast')
+    +'<small>'+[v.publisher,v.type,v.start&&Date.parse(v.start)>Date.now()?'starts '+dayOf(v.start)+', '+timeOf(v.start):''].filter(Boolean).map(esc).join(' · ')+'</small></a>').join('')+'</div>';
+  else s+='<p class="note">No webcast announced yet. Official streams are usually added a day or two before launch.</p>';
+  const me=WHERE.saved();
+  if(me&&l.pad.lat!=null){ const km=distance([me.lat,me.lon],[l.pad.lat,l.pad.lon]), dir=compass(bearing([me.lat,me.lon],[l.pad.lat,l.pad.lon]));
+    s+='<p class="note">The launch site is '+Math.round(km).toLocaleString()+' km from you'+(km<1000?', to the '+dir+'. '+(km<250?'You may well see it climb from where you are if the sky is clear.':'On a clear day you may see it low on the horizon. Launches just after sunset or before sunrise can light up the sky from much further away.'):'.')+'</p>'; }
+  s+='</div>';
+
+  // where it's going
+  const h=heading(l);
+  s+='<div><h3>Where it’s going</h3><p>'+esc(ORBIT[l.mission.orbitCode]||l.mission.orbit||'Destination not published.')+'</p>';
+  if(l.pad.lat!=null) s+=mapSvg(l,h)+'<p class="note">'+(h?'The dashed line is the rough direction of flight for the first few minutes (heading '+compass(h.az)+(h.target?', to line up with '+h.target:'')+'). It’s our estimate from the target orbit.':'The exact flight path for this launch hasn’t been published.')+' Launch site: '+esc(l.pad.name||'')+(l.pad.map?' · <a href="'+esc(l.pad.map)+'" target="_blank" rel="noopener">open in maps</a>':'')+'</p>';
+  if(l.flightclub) s+='<p class="note"><a href="'+esc(l.flightclub)+'" target="_blank" rel="noopener">See the full simulated trajectory in 3D (FlightClub)</a></p>';
+  for(const st of l.stages){ if(!st.serial&&!st.landing) continue;
+    s+='<p class="note">'+(st.type==='Core'?'Booster':esc(st.type||'Stage'))+(st.serial?' '+esc(st.serial):'')+(st.flight?' (flight '+st.flight+')':'')
+      +(st.landing&&st.landing.attempt?(st.landing.success===true?' landed':st.landing.success===false?' failed to land':' will try to land')+(st.landing.where?' on '+esc(st.landing.where):'')+(st.landing.type?' ('+esc(st.landing.type.toLowerCase())+')':''):st.landing&&st.landing.attempt===false?': no landing attempt':'')+'.</p>'; }
+  s+='</div>';
+
+  // key moments
+  const tl=l.timeline.filter(x=>KEEP.has(x[0]));
+  if(tl.length) s+='<div><h3>Key moments</h3><div class="tl">'+tl.map(([k,sec])=>'<span>'+rel(sec)+'</span><div>'+esc(MOMENT[k]||k)+'</div>').join('')+'</div></div>';
+
+  if(l.links.length) s+='<div class="links">'+l.links.map(x=>'<a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.title||x.type||'More info')+'</a>').join('')+'</div>';
+  return s+'</div></details>'; }
+
+// ---------- page ----------
+let data=null, filter='all';
+async function load(){ try{ const r=await fetch(DATA+'launches.json',{cache:'no-store'}); if(r.ok) data=await r.json(); }catch(e){} }
+function render(){ if(!data){ $('content').innerHTML='<section><p class="note">Couldn’t load the launch schedule. Check your connection and reload.</p></section>'; return; }
+  const open=new Set([...document.querySelectorAll('details.ln[open]')].map(d=>d.id)), hash=decodeURIComponent(location.hash.slice(1));
+  if(hash) open.add(hash);
+  CALENDAR.reset(); MAPS.length=0;
+  const now=Date.now(); let up=data.upcoming.filter(l=>Date.parse(l.net)>now-6*36e5||['In Flight','Hold','Go'].includes(l.status.abbrev));
+  if(filter==='crew') up=up.filter(l=>crewOf(l).length);
+  if(filter==='week') up=up.filter(l=>Date.parse(l.net)<now+7*864e5);
+  const next=data.upcoming.find(l=>exact(l)&&Date.parse(l.net)>now-36e5);
+  let out='';
+  if(next&&filter==='all') out+='<section><h2>Next launch</h2>'+card(next,true)+'</section>';
+  const rest=up.filter(l=>!(next&&filter==='all'&&l.id===next.id));
+  out+='<section><h2>'+(filter==='crew'?'Launches with people on board':filter==='week'?'In the next 7 days':'Coming up')+'</h2>'
+    +(rest.length?rest.map(l=>card(l,open.has(l.slug))).join(''):'<p class="note">'+(filter==='crew'?'No crewed launches on the schedule right now. Crewed flights to the space stations go up every few months; check back soon.':'Nothing on the schedule for this period.')+'</p>')+'</section>';
+  if(filter==='all'&&data.recent.length) out+='<section><h2>Just launched</h2>'+data.recent.map(l=>card(l,open.has(l.slug))).join('')+'</section>';
+  $('content').innerHTML=out;
+  document.querySelectorAll('svg.map[data-k]').forEach(drawLand);
+  $('tz').textContent='Times in your time zone ('+zoneName+') · updated '+timeOf(data.updated);
+  if(hash){ const el=document.getElementById(hash); if(el&&!render.scrolled){ render.scrolled=true; el.scrollIntoView({block:'start'}); } } }
+document.querySelectorAll('#filter button').forEach(b=>b.onclick=()=>{ filter=b.dataset.f; document.querySelectorAll('#filter button').forEach(x=>x.classList.toggle('on',x===b)); render(); });
+await load(); render();
+// fresh schedule every 15 minutes (the copy updates hourly), but never while someone has a calendar menu open
+setInterval(async()=>{ if(document.visibilityState!=='visible'||CALENDAR.isOpen()) return; await load(); render(); },15*6e4);
+})();
+</script>
+</body>
+</html>
