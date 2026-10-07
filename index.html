@@ -57,6 +57,9 @@ canvas{display:block;touch-action:none}
 .clock span{display:block;color:var(--hud);font-size:17px;font-weight:500}
 .hint{position:absolute;left:14px;bottom:104px;transition:opacity .4s;font-size:12px;color:var(--hud3);pointer-events:none;text-shadow:0 1px 3px var(--halo)}
 .viewbtns{position:absolute;right:14px;bottom:12px;display:flex;gap:6px}
+/* hide the whole side menu: the globe fills the screen */
+body.nopanel #panel{display:none}
+body.nopanel #app{grid-template-columns:1fr!important;grid-template-rows:1fr!important}
 /* time slider: scrub up to 12 hours back or 24 hours ahead, or play it fast */
 .timebar{position:absolute;left:14px;right:14px;bottom:56px;display:flex;gap:8px;align-items:center;background:var(--hudbtn);border:1px solid var(--line);border-radius:10px;padding:5px 8px;color:var(--hud)}
 .timebar button{padding:4px 10px;font-size:13px;background:transparent;color:var(--hud);border-color:var(--line);white-space:nowrap}
@@ -211,6 +214,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
 </style>
 </head>
 <body>
+<script>try{ if(localStorage.getItem('ovh:panel')==='hidden') document.body.classList.add('nopanel'); }catch(e){}</script>
 <div id="app">
   <div id="mapwrap">
     <div class="hud">
@@ -227,7 +231,7 @@ button.link{background:none;border:0;padding:0;color:var(--ink2);text-decoration
     <button id="youTime" aria-label="Your place and its local time: fly the globe there"><span id="youPlace"></span><b id="youClock"></b><small id="youZone"></small></button>
     <div id="cmp" role="dialog" aria-label="Compass"><button class="x" id="cmpClose" aria-label="Close compass">×</button><svg viewBox="-70 -70 140 140" aria-hidden="true"><g class="dial" id="cmpDial"><circle class="ring" r="60"/><g id="cmpTicks"></g><text class="n" y="-46">N</text><text x="46">E</text><text y="46">S</text><text x="-46">W</text></g><path class="me" d="M0,-66 L7,-52 H-7Z"/><circle r="3" class="me"/></svg><b id="cmpDir">Starting…</b><span id="cmpNote">Hold your phone flat, top pointing the way you’re facing.</span><div class="calib"><button id="cmpSet">Set as north</button><button class="link" id="cmpUnset" hidden>Undo</button></div><span class="ch" id="cmpCalNote">Reading wrong? Point the top of your phone at something you know is north, then tap “Set as north”.</span></div>
     <div class="timebar" id="timebar"><button id="tPlay" aria-label="Play time forward fast">▶</button><input type="range" id="tRange" min="-720" max="1440" step="1" value="0" aria-label="Time, in minutes from now"><button id="tNow" class="on">Live</button></div>
-    <div class="viewbtns"><button id="reset">Reset view</button><button id="follow" style="display:none">Fly to it</button></div>
+    <div class="viewbtns"><button id="reset">Reset view</button><button id="follow" style="display:none">Fly to it</button><button id="panelBtn" aria-controls="panel" aria-expanded="true">Hide menu</button></div>
   </div>
   <div id="panel">
     <nav class="pages" aria-label="Pages"><a class="on" aria-current="page" href="./">Live globe</a><a href="tonight.html">Tonight’s sky</a><a href="launches.html">Launches</a></nav>
@@ -619,6 +623,11 @@ function compassOffset(){ try{ return (+localStorage.getItem('ovh:northFix')||0)
     kind='ondeviceorientationabsolute' in window?'deviceorientationabsolute':'deviceorientation'; window.addEventListener(kind,onOrient);
     timer=setTimeout(()=>{ if(on&&!last){ dirEl.textContent='No compass found'; note.textContent='This device doesn’t have a compass (most laptops don’t). Try on your phone.'; } },3000); }
   btn.onclick=start; document.getElementById('cmpClose').onclick=stop; })();
+// hide or show the whole side menu (remembered on this device); the globe resizes itself
+const panelBtn=document.getElementById('panelBtn');
+function panelLabel(){ const hidden=document.body.classList.contains('nopanel'); panelBtn.textContent=hidden?'Show menu':'Hide menu'; panelBtn.setAttribute('aria-expanded',String(!hidden)); }
+panelBtn.onclick=()=>{ const hidden=document.body.classList.toggle('nopanel'); try{ localStorage.setItem('ovh:panel',hidden?'hidden':'shown'); }catch(e){} panelLabel(); };
+panelLabel();
 // reset: back over your location, or over the UK if you haven't shared one
 document.getElementById('reset').onclick=()=>{ const dir=me?youMarker.position.clone().normalize():onSphere(54.5,-3,1).normalize(); flyTo(dir.multiplyScalar(R*3.2)); };
 followBtn.onclick=()=>{ if(!sel||!sel.ok) return; const p=new THREE.Vector3(sel.x,sel.y,sel.z); const d=Math.max(p.length()*1.4,R*2.6); flyTo(p.clone().normalize().multiplyScalar(d)); };
